@@ -864,9 +864,9 @@ const seedStandards: Standard[] = [
 
 // ─── Vendors ────────────────────────────────────────────────────────
 const seedVendors: Vendor[] = [
-  { id: 'v1', name: 'Metrology Solutions Pvt Ltd', accreditationNo: 'NABL-1023', scope: 'Dimensional, Pressure', contact: '+91-9876543210' },
-  { id: 'v2', name: 'Precision Cal India', accreditationNo: 'NABL-2045', scope: 'Electrical, Temperature, Dimensional', contact: '+91-9123456780' },
-  { id: 'v3', name: 'TechCal Services', accreditationNo: 'NABL-3067', scope: 'Torque, Force, Mass', contact: '+91-9988776655' },
+  { id: 'v1', name: 'Metrology Solutions Pvt Ltd', accreditationNo: 'NABL-1023', scope: 'Vernier Caliper, Ring Gauge, Plug Gauge', contact: '+91-9876543210' },
+  { id: 'v2', name: 'Precision Cal India', accreditationNo: 'NABL-2045', scope: 'Micrometer, Height Gauge, Dial Indicator', contact: '+91-9123456780' },
+  { id: 'v3', name: 'TechCal Services', accreditationNo: 'NABL-3067', scope: 'Torque Wrench, Bore Gauge, Thread Gauge', contact: '+91-9988776655' },
 ];
 
 // ─── Gauges ─────────────────────────────────────────────────────────

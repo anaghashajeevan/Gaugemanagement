@@ -77,6 +77,27 @@ export default function Calibration() {
   const standards = standardStorage.getAll();
   const vendors = vendorStorage.getAll();
 
+  // ─── Vendors accredited for the selected gauge's type ─────────────
+  const selectedExternalGauge = useMemo(
+    () => gauges.find((g) => g.id === extForm.gaugeId),
+    [gauges, extForm.gaugeId]
+  );
+
+  const scopeTypes = (v: (typeof vendors)[number]) =>
+    v.scope.split(',').map((s) => s.trim()).filter(Boolean);
+
+  const eligibleVendors = useMemo(() => {
+    if (!selectedExternalGauge) return vendors;
+    const matches = vendors.filter((v) =>
+      scopeTypes(v).includes(selectedExternalGauge.type)
+    );
+    return matches.length > 0 ? matches : vendors;
+  }, [vendors, selectedExternalGauge]);
+
+  const vendorScopeMismatch =
+    !!selectedExternalGauge &&
+    !vendors.some((v) => scopeTypes(v).includes(selectedExternalGauge.type));
+
   const reload = () => setRecords(calibrationStorage.getAll());
 
   const filtered = useMemo(() => {
@@ -605,7 +626,7 @@ export default function Calibration() {
             <select
               value={extForm.gaugeId}
               onChange={(e) =>
-                setExtForm({ ...extForm, gaugeId: e.target.value })
+                setExtForm({ ...extForm, gaugeId: e.target.value, vendorId: '' })
               }
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition text-sm appearance-none cursor-pointer"
             >
@@ -632,12 +653,22 @@ export default function Calibration() {
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition text-sm appearance-none cursor-pointer"
             >
               <option value="">Select a vendor</option>
-              {vendors.map((v) => (
+              {eligibleVendors.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name} ({v.accreditationNo})
                 </option>
               ))}
             </select>
+            {selectedExternalGauge && !vendorScopeMismatch && (
+              <p className="text-xs text-emerald-600 mt-1">
+                Showing labs accredited for "{selectedExternalGauge.type}".
+              </p>
+            )}
+            {vendorScopeMismatch && (
+              <p className="text-xs text-amber-600 mt-1">
+                No lab is accredited for "{selectedExternalGauge!.type}" yet — showing all vendors. Add this scope under Outside Labs.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

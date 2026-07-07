@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type MouseEvent, type ReactNode, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../images/logo.png';
@@ -13,6 +13,7 @@ import {
   Users,
   ShieldCheck,
   Building2,
+  FlaskConical,
   ScrollText,
   KeyRound,
   LogOut,
@@ -23,18 +24,43 @@ import {
 interface Props {
   children: ReactNode;
   pageTitle?: string;
+  headerAction?: ReactNode;
 }
 
-export default function Layout({ children, pageTitle = 'Dashboard' }: Props) {
+export default function Layout({ children, pageTitle = 'Dashboard', headerAction }: Props) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  const navRef = useRef<HTMLElement | null>(null);
+  const dragState = useRef({ dragging: false, startY: 0, startScrollTop: 0 });
+
+  const handleDragStart = (e: MouseEvent) => {
+    if (!navRef.current) return;
+    dragState.current = {
+      dragging: true,
+      startY: e.clientY,
+      startScrollTop: navRef.current.scrollTop,
+    };
+  };
+
+  const handleDragMove = (e: MouseEvent) => {
+    if (!dragState.current.dragging || !navRef.current) return;
+    const delta = e.clientY - dragState.current.startY;
+    navRef.current.scrollTop = dragState.current.startScrollTop - delta;
+  };
+
+  const stopDrag = () => {
+    dragState.current.dragging = false;
+  };
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
+
+  const showPageHeading = pageTitle !== 'Dashboard';
 
   const isAdmin = user?.role_code === 'admin';
   const isQualityEng = user?.role_code === 'quality_engineer';
@@ -54,6 +80,7 @@ export default function Layout({ children, pageTitle = 'Dashboard' }: Props) {
     { label: 'User Management', path: '/admin/users', icon: Users },
     { label: 'Roles', path: '/admin/roles', icon: ShieldCheck },
     { label: 'Departments', path: '/admin/departments', icon: Building2 },
+    { label: 'Outside Labs', path: '/admin/outside-labs', icon: FlaskConical },
     { label: 'Audit Trail', path: '/admin/audit', icon: ScrollText },
   ];
 
@@ -66,31 +93,26 @@ export default function Layout({ children, pageTitle = 'Dashboard' }: Props) {
       }}
     >
       {/* ─── Sidebar ─────────────────────────────────────────────────── */}
-      <aside className="fixed top-0 left-0 h-screen w-64 bg-white border-r border-gray-200 overflow-y-auto z-40 shadow-sm">
+      <aside className="fixed top-20 left-0 h-[calc(100vh-5rem)] w-64 bg-white border-r border-gray-200 z-40 shadow-sm flex flex-col">
         {/* Rainbow top bar */}
         <div
-          className="h-1.5"
+          className="h-1.5 shrink-0"
           style={{
             background:
               'linear-gradient(90deg, #4338ca 0%, #7c3aed 25%, #a855f7 45%, #10b981 70%, #eab308 100%)',
           }}
         />
 
-        {/* Logo Section */}
-        <div className="p-4 border-b border-gray-100">
-          <img
-            src={logo}
-            alt="NL Technologies"
-            className="h-12 w-auto object-contain mb-2"
-          />
-          <div>
-            <h1 className="text-gray-800 font-bold text-sm">Gauge Calibration</h1>
-            <p className="text-xs text-gray-500">Management Suite</p>
-          </div>
-        </div>
-
         {/* Menu */}
-        <nav className="p-3 space-y-1">
+        <nav
+          ref={navRef}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={stopDrag}
+          onMouseLeave={stopDrag}
+          className="flex-1 p-3 space-y-1 overflow-y-auto cursor-grab active:cursor-grabbing select-none [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           <p className="px-3 py-2 text-[10px] uppercase tracking-widest text-gray-400 font-bold">
             Main
           </p>
@@ -175,17 +197,19 @@ export default function Layout({ children, pageTitle = 'Dashboard' }: Props) {
       </aside>
 
       {/* ─── Top Header ──────────────────────────────────────────────── */}
-      <header className="fixed top-0 left-64 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 z-30">
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">{pageTitle}</h2>
-          <p className="text-xs text-gray-500">
-            {new Date().toLocaleDateString('en-IN', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </p>
+      <header className="fixed top-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 z-40">
+        <div className="flex items-center gap-3 w-64 shrink-0">
+          <img
+            src={logo}
+            alt="NL Technologies"
+            className="h-12 w-auto object-contain"
+          />
+        </div>
+
+        <div className="absolute left-1/2 -translate-x-1/2 text-center">
+          <h1 className="text-lg font-bold text-gray-800 leading-tight">
+            Gauge Calibration Management System
+          </h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -292,7 +316,25 @@ export default function Layout({ children, pageTitle = 'Dashboard' }: Props) {
       </header>
 
       {/* ─── Main Content ─────────────────────────────────────────────── */}
-      <main className="ml-64 mt-16 p-6">{children}</main>
+      <main className="ml-64 mt-20 p-6">
+        {showPageHeading && (
+          <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">{pageTitle}</h2>
+              <p className="text-sm text-gray-500">
+                {new Date().toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </p>
+            </div>
+            {headerAction}
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

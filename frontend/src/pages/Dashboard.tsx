@@ -663,7 +663,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ─── Module Roadmap ────────────────────────────────────────── */}
+      {/* ─── Module Roadmap ─────────────────────────────────
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div
           className="h-1"
@@ -686,7 +686,6 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Complete */}
             <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white">
@@ -716,7 +715,6 @@ export default function Dashboard() {
               </ul>
             </div>
 
-            {/* Next Up */}
             <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-white">
@@ -739,7 +737,6 @@ export default function Dashboard() {
               </ul>
             </div>
 
-            {/* Planned */}
             <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white">
@@ -765,6 +762,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      ──────────────────────────────────────────────────────────────── */}
     </Layout>
   );
 }

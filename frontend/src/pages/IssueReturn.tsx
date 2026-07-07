@@ -719,7 +719,18 @@ export default function IssueReturn() {
   ];
 
   return (
-    <Layout pageTitle="Issue / Return">
+    <Layout
+      pageTitle="Issue / Return"
+      headerAction={
+        <button
+          onClick={() => { setIssueGaugeId(''); setIssueTo(''); setIssueError(''); setIssueModalOpen(true); }}
+          className="flex items-center gap-2 px-5 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition text-sm"
+          style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
+          <Send className="w-4 h-4" strokeWidth={2.5} />
+          Issue a Gauge
+        </button>
+      }
+    >
       {/* Quarantine Warning */}
       {blockedGauges.length > 0 && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
@@ -734,17 +745,6 @@ export default function IssueReturn() {
           </div>
         </div>
       )}
-
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div />
-        <button
-          onClick={() => { setIssueGaugeId(''); setIssueTo(''); setIssueError(''); setIssueModalOpen(true); }}
-          className="flex items-center gap-2 px-5 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition text-sm"
-          style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
-          <Send className="w-4 h-4" strokeWidth={2.5} />
-          Issue a Gauge
-        </button>
-      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">

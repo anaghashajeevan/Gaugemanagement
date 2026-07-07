@@ -802,6 +802,22 @@ export default function CAPAPage() {
         </div>
       )}
 
+      {/* ─── Stats ────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: 'Total', value: capas.length, accent: 'from-indigo-500 to-purple-500' },
+          { label: 'Open', value: openCount, accent: 'from-amber-500 to-yellow-500' },
+          { label: 'Overdue', value: overdueCount, accent: 'from-red-500 to-rose-500' },
+          { label: 'Quarantined Gauges', value: quarantinedGauges, accent: 'from-red-600 to-red-500' },
+        ].map((s) => (
+          <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden">
+            <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`} />
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{s.label}</p>
+            <p className="text-2xl font-bold text-gray-800 mt-1">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
       {/* ─── Top Bar ──────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 flex-1 max-w-lg">
@@ -827,22 +843,6 @@ export default function CAPAPage() {
           <Plus className="w-4 h-4" strokeWidth={2.5} />
           New CAPA
         </button>
-      </div>
-
-      {/* ─── Stats ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Total', value: capas.length, accent: 'from-indigo-500 to-purple-500' },
-          { label: 'Open', value: openCount, accent: 'from-amber-500 to-yellow-500' },
-          { label: 'Overdue', value: overdueCount, accent: 'from-red-500 to-rose-500' },
-          { label: 'Quarantined Gauges', value: quarantinedGauges, accent: 'from-red-600 to-red-500' },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden">
-            <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`} />
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{s.label}</p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">{s.value}</p>
-          </div>
-        ))}
       </div>
 
       {/* ─── Table ────────────────────────────────────────────────── */}

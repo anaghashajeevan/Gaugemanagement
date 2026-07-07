@@ -66,6 +66,7 @@ import Reports from './pages/Reports';
 import Users from './pages/admin/Users';
 import Roles from './pages/admin/Roles';
 import Departments from './pages/admin/Departments';
+import OutsideLabs from './pages/admin/OutsideLabs';
 import AuditTrail from './pages/admin/AuditTrail';
 
 function AppRoutes() {
@@ -123,6 +124,9 @@ function AppRoutes() {
       } />
       <Route path="/admin/departments" element={
         <ProtectedRoute requiredRole="admin"><Departments /></ProtectedRoute>
+      } />
+      <Route path="/admin/outside-labs" element={
+        <ProtectedRoute requiredRole="admin"><OutsideLabs /></ProtectedRoute>
       } />
       <Route path="/admin/audit" element={
         <ProtectedRoute requiredRole="admin"><AuditTrail /></ProtectedRoute>

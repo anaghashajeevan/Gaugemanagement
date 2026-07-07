@@ -13,6 +13,7 @@ import {
   generateId,
   type Gauge,
 } from '../utils/storage';
+import { GAUGE_TYPES } from '../utils/constants';
 import {
   Gauge as GaugeIcon,
   Plus,
@@ -22,21 +23,6 @@ import {
   Trash2,
   AlertCircle,
 } from 'lucide-react';
-
-const GAUGE_TYPES = [
-  'Vernier Caliper',
-  'Micrometer',
-  'Height Gauge',
-  'Dial Indicator',
-  'Feeler Gauge',
-  'Ring Gauge',
-  'Plug Gauge',
-  'Roughness Tester',
-  'Torque Wrench',
-  'Bore Gauge',
-  'Thread Gauge',
-  'Other',
-];
 
 const STATUS_OPTIONS: Gauge['status'][] = [
   'Available',
@@ -228,6 +214,53 @@ export default function GaugeMaster() {
   // ─── Render ───────────────────────────────────────────────────────
   return (
     <Layout pageTitle="Gauge Master">
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[
+          {
+            label: 'Total',
+            value: gauges.length,
+            accent: 'from-indigo-500 to-purple-500',
+            bg: 'bg-indigo-50',
+            text: 'text-indigo-600',
+          },
+          {
+            label: 'Available',
+            value: gauges.filter((g) => g.status === 'Available').length,
+            accent: 'from-emerald-500 to-teal-500',
+            bg: 'bg-emerald-50',
+            text: 'text-emerald-600',
+          },
+          {
+            label: 'Issued',
+            value: gauges.filter((g) => g.status === 'Issued').length,
+            accent: 'from-blue-500 to-cyan-500',
+            bg: 'bg-blue-50',
+            text: 'text-blue-600',
+          },
+          {
+            label: 'Overdue',
+            value: gauges.filter((g) => getDueStatus(g.nextDueDate) === 'Overdue').length,
+            accent: 'from-red-500 to-rose-500',
+            bg: 'bg-red-50',
+            text: 'text-red-600',
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden"
+          >
+            <div
+              className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${stat.accent}`}
+            />
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
+              {stat.label}
+            </p>
+            <p className="text-2xl font-bold text-gray-800 mt-1">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Top Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 flex-1 max-w-xl">
@@ -282,53 +315,6 @@ export default function GaugeMaster() {
           <Plus className="w-4 h-4" strokeWidth={2.5} />
           Add Gauge
         </button>
-      </div>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          {
-            label: 'Total',
-            value: gauges.length,
-            accent: 'from-indigo-500 to-purple-500',
-            bg: 'bg-indigo-50',
-            text: 'text-indigo-600',
-          },
-          {
-            label: 'Available',
-            value: gauges.filter((g) => g.status === 'Available').length,
-            accent: 'from-emerald-500 to-teal-500',
-            bg: 'bg-emerald-50',
-            text: 'text-emerald-600',
-          },
-          {
-            label: 'Issued',
-            value: gauges.filter((g) => g.status === 'Issued').length,
-            accent: 'from-blue-500 to-cyan-500',
-            bg: 'bg-blue-50',
-            text: 'text-blue-600',
-          },
-          {
-            label: 'Overdue',
-            value: gauges.filter((g) => getDueStatus(g.nextDueDate) === 'Overdue').length,
-            accent: 'from-red-500 to-rose-500',
-            bg: 'bg-red-50',
-            text: 'text-red-600',
-          },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden"
-          >
-            <div
-              className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${stat.accent}`}
-            />
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
-              {stat.label}
-            </p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">{stat.value}</p>
-          </div>
-        ))}
       </div>
 
       {/* Table */}
