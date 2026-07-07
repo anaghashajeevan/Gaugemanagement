@@ -1,122 +1,147 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+// import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// import { AuthProvider } from './context/AuthContext';
+// import ProtectedRoute from './components/ProtectedRoute';
+// import Login from './pages/Login';
+// import Dashboard from './pages/Dashboard';
+// import ChangePassword from './pages/ChangePassword';
 
-function App() {
-  const [count, setCount] = useState(0)
+// function App() {
+//   return (
+//     <AuthProvider>
+//       <BrowserRouter>
+//         <Routes>
+//           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+//           <Route path="/login" element={<Login />} />
+          
+//           <Route
+//             path="/dashboard"
+//             element={
+//               <ProtectedRoute>
+//                 <Dashboard />
+//               </ProtectedRoute>
+//             }
+//           />
+          
+//           <Route
+//             path="/change-password"
+//             element={
+//               <ProtectedRoute>
+//                 <ChangePassword />
+//               </ProtectedRoute>
+//             }
+//           />
+          
+//           <Route path="*" element={<Navigate to="/dashboard" replace />} />
+//         </Routes>
+//       </BrowserRouter>
+//     </AuthProvider>
+//   );
+// }
+
+// export default App;
+
+// src/App.tsx
+
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import { useEffect } from 'react';
+import { seedIfEmpty } from './utils/storage';
+
+// Auth Pages
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import ChangePassword from './pages/ChangePassword';
+
+// Main Pages
+import GaugeMaster from './pages/GaugeMaster';
+import GaugeHistory from './pages/GaugeHistory';
+import Calibration from './pages/Calibration';
+import MSA from './pages/MSA';
+import CAPA from './pages/CAPA';
+import IssueReturn from './pages/IssueReturn';
+import Reports from './pages/Reports';
+
+// Admin Pages
+import Users from './pages/admin/Users';
+import Roles from './pages/admin/Roles';
+import Departments from './pages/admin/Departments';
+import AuditTrail from './pages/admin/AuditTrail';
+
+function AppRoutes() {
+  useEffect(() => {
+    seedIfEmpty();
+  }, []);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <Routes>
+      {/* Default redirect */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      <div className="ticks"></div>
+      {/* Public */}
+      <Route path="/login" element={<Login />} />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* Protected — All roles */}
+      <Route path="/dashboard" element={
+        <ProtectedRoute><Dashboard /></ProtectedRoute>
+      } />
+      <Route path="/change-password" element={
+        <ProtectedRoute><ChangePassword /></ProtectedRoute>
+      } />
+      <Route path="/gauges" element={
+        <ProtectedRoute><GaugeMaster /></ProtectedRoute>
+      } />
+      <Route path="/gauges/:id" element={
+        <ProtectedRoute><GaugeHistory /></ProtectedRoute>
+      } />
+      <Route path="/capa" element={
+        <ProtectedRoute><CAPA /></ProtectedRoute>
+      } />
+      <Route path="/issue-return" element={
+        <ProtectedRoute><IssueReturn /></ProtectedRoute>
+      } />
+      <Route path="/reports" element={
+        <ProtectedRoute><Reports /></ProtectedRoute>
+      } />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {/* Protected — Non-operator */}
+      <Route path="/calibration" element={
+        <ProtectedRoute><Calibration /></ProtectedRoute>
+      } />
+
+      {/* Protected — Quality Engineer + Admin */}
+      <Route path="/msa" element={
+        <ProtectedRoute><MSA /></ProtectedRoute>
+      } />
+
+      {/* Admin only */}
+      <Route path="/admin/users" element={
+        <ProtectedRoute requiredRole="admin"><Users /></ProtectedRoute>
+      } />
+      <Route path="/admin/roles" element={
+        <ProtectedRoute requiredRole="admin"><Roles /></ProtectedRoute>
+      } />
+      <Route path="/admin/departments" element={
+        <ProtectedRoute requiredRole="admin"><Departments /></ProtectedRoute>
+      } />
+      <Route path="/admin/audit" element={
+        <ProtectedRoute requiredRole="admin"><AuditTrail /></ProtectedRoute>
+      } />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
 }
 
-export default App
+function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+
+export default App;
