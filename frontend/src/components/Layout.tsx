@@ -94,15 +94,6 @@ export default function Layout({ children, pageTitle = 'Dashboard', headerAction
     >
       {/* ─── Sidebar ─────────────────────────────────────────────────── */}
       <aside className="fixed top-20 left-0 h-[calc(100vh-5rem)] w-64 bg-white border-r border-gray-200 z-40 shadow-sm flex flex-col">
-        {/* Rainbow top bar */}
-        <div
-          className="h-1.5 shrink-0"
-          style={{
-            background:
-              'linear-gradient(90deg, #4338ca 0%, #7c3aed 25%, #a855f7 45%, #10b981 70%, #eab308 100%)',
-          }}
-        />
-
         {/* Menu */}
         <nav
           ref={navRef}

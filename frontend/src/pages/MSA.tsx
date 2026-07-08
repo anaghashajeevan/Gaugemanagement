@@ -706,6 +706,7 @@
 // src/pages/MSA.tsx
 
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import DataTable, { type Column } from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
@@ -738,18 +739,23 @@ import {
   ChevronRight,
   Mail,
   Loader2,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 
 type MainTab = 'studies' | 'measurements' | 'results' | 'my_tasks';
 type StudyTypeFilter = 'all' | 'GRR' | 'Linearity' | 'Bias' | 'Uncertainty';
+type StatCardFilter = 'all' | 'pending' | 'passed' | 'failed';
 
 export default function MSA() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [studies, setStudies] = useState<MSAStudy[]>(msaStorage.getAll());
   const [mainTab, setMainTab] = useState<MainTab>(
     user?.role_code === 'shop_floor_operator' ? 'my_tasks' : 'studies'
   );
   const [studyTypeFilter, setStudyTypeFilter] = useState<StudyTypeFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatCardFilter>('all');
 
   // Backend operators (real users)
   const [backendOperators, setBackendOperators] = useState<GaugeUser[]>([]);
@@ -797,7 +803,21 @@ export default function MSA() {
 
   const gauges = gaugeStorage.getAll();
   const parts = partStorage.getAll();
+  const capas = capaStorage.getAll();
   const reload = () => setStudies(msaStorage.getAll());
+
+  const capaForStudy = (studyId: string) =>
+    capas.find((c) => c.sourceType === 'MSA' && c.sourceId === studyId);
+
+  const openCapaPrompt = (study: MSAStudy) => {
+    setCapaForm({
+      rootCause: '',
+      correctiveAction: '',
+      responsiblePerson: '',
+      targetDate: '',
+    });
+    setCapaPrompt(study);
+  };
 
   const isAdmin = user?.role_code === 'admin';
   const isQE = user?.role_code === 'quality_engineer';
@@ -832,10 +852,17 @@ export default function MSA() {
     if (studyTypeFilter !== 'all') {
       list = list.filter((s) => s.studyType === studyTypeFilter);
     }
+    if (statusFilter === 'pending') {
+      list = list.filter((s) => s.status === 'Pending Measurements');
+    } else if (statusFilter === 'passed') {
+      list = list.filter((s) => s.passFail === 'Pass');
+    } else if (statusFilter === 'failed') {
+      list = list.filter((s) => s.passFail === 'Fail');
+    }
     return list.sort(
       (a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime()
     );
-  }, [studies, studyTypeFilter]);
+  }, [studies, studyTypeFilter, statusFilter]);
 
   const pendingStudies = useMemo(
     () => studies.filter((s) => ['Pending Measurements', 'In Progress'].includes(s.status)),
@@ -861,11 +888,17 @@ export default function MSA() {
   const selectedStudy = selectedStudyId ? msaStorage.getById(selectedStudyId) : null;
 
   // ─── Stats ────────────────────────────────────────────────────────
-  const stats = [
-    { label: 'Total Studies', value: studies.length, accent: 'from-indigo-500 to-purple-500', icon: BarChart3 },
-    { label: 'Pending', value: studies.filter((s) => s.status === 'Pending Measurements').length, accent: 'from-amber-500 to-yellow-500', icon: Clock },
-    { label: 'Passed', value: studies.filter((s) => s.passFail === 'Pass').length, accent: 'from-emerald-500 to-teal-500', icon: CheckCircle2 },
-    { label: 'Failed', value: studies.filter((s) => s.passFail === 'Fail').length, accent: 'from-red-500 to-rose-500', icon: AlertTriangle },
+  const stats: {
+    key: StatCardFilter;
+    label: string;
+    value: number;
+    accent: string;
+    icon: typeof BarChart3;
+  }[] = [
+    { key: 'all', label: 'Total Studies', value: studies.length, accent: 'from-indigo-500 to-purple-500', icon: BarChart3 },
+    { key: 'pending', label: 'Pending', value: studies.filter((s) => s.status === 'Pending Measurements').length, accent: 'from-amber-500 to-yellow-500', icon: Clock },
+    { key: 'passed', label: 'Passed', value: studies.filter((s) => s.passFail === 'Pass').length, accent: 'from-emerald-500 to-teal-500', icon: CheckCircle2 },
+    { key: 'failed', label: 'Failed', value: studies.filter((s) => s.passFail === 'Fail').length, accent: 'from-red-500 to-rose-500', icon: AlertTriangle },
   ];
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1191,7 +1224,7 @@ export default function MSA() {
     reload();
     const updatedStudy = msaStorage.getById(studyId);
     if (updatedStudy && passFail === 'Fail') {
-      setCapaPrompt(updatedStudy);
+      openCapaPrompt(updatedStudy);
     }
   };
 
@@ -1228,6 +1261,7 @@ export default function MSA() {
       responsiblePerson: '',
       targetDate: '',
     });
+    reload();
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1308,10 +1342,10 @@ export default function MSA() {
     },
     {
       header: 'Actions',
-      width: '100px',
-      align: 'center' as const,
+      width: '140px',
+      align: 'left' as const,
       cell: (r) => (
-        <div className="flex items-center justify-center gap-1">
+        <div className="flex items-center justify-start gap-1">
           {['Completed', 'Failed'].includes(r.status) && (
             <button
               onClick={(e) => {
@@ -1334,6 +1368,30 @@ export default function MSA() {
               title="Calculate Result"
             >
               <Calculator className="w-4 h-4" strokeWidth={2} />
+            </button>
+          )}
+          {r.passFail === 'Fail' && canCreate && !capaForStudy(r.id) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openCapaPrompt(r);
+              }}
+              className="p-1.5 hover:bg-amber-50 rounded-lg transition text-amber-500"
+              title="Create CAPA"
+            >
+              <AlertTriangle className="w-4 h-4" strokeWidth={2} />
+            </button>
+          )}
+          {r.passFail === 'Fail' && capaForStudy(r.id) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/capa');
+              }}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition text-gray-400"
+              title="View CAPA"
+            >
+              <ExternalLink className="w-4 h-4" strokeWidth={2} />
             </button>
           )}
         </div>
@@ -1395,10 +1453,19 @@ export default function MSA() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {stats.map((s) => {
             const Icon = s.icon;
+            const active = statusFilter === s.key;
             return (
-              <div
+              <button
                 key={s.label}
-                className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden"
+                onClick={() => {
+                  setStatusFilter(s.key);
+                  setMainTab('studies');
+                }}
+                className={`w-full bg-white rounded-xl p-4 shadow-sm border relative overflow-hidden text-left transition hover:shadow-md ${
+                  active
+                    ? 'border-indigo-300 ring-2 ring-indigo-100'
+                    : 'border-gray-100'
+                }`}
               >
                 <div
                   className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`}
@@ -1414,7 +1481,7 @@ export default function MSA() {
                   </div>
                   <Icon className="w-5 h-5 text-gray-300" strokeWidth={2} />
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -1463,6 +1530,15 @@ export default function MSA() {
 
         {mainTab === 'studies' && canCreate && (
           <div className="flex items-center gap-3">
+            {statusFilter !== 'all' && (
+              <button
+                onClick={() => setStatusFilter('all')}
+                className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold hover:bg-indigo-100 transition"
+              >
+                {stats.find((s) => s.key === statusFilter)?.label}
+                <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+            )}
             <select
               value={studyTypeFilter}
               onChange={(e) =>
@@ -2489,12 +2565,39 @@ export default function MSA() {
         }
         maxWidth="lg"
         footer={
-          <button
-            onClick={() => setViewResultStudy(null)}
-            className="px-4 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold rounded-xl transition text-sm"
-          >
-            Close
-          </button>
+          <>
+            {viewResultStudy?.passFail === 'Fail' &&
+              canCreate &&
+              !capaForStudy(viewResultStudy.id) && (
+                <button
+                  onClick={() => {
+                    const study = viewResultStudy;
+                    setViewResultStudy(null);
+                    if (study) openCapaPrompt(study);
+                  }}
+                  className="mr-auto px-4 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition text-sm bg-amber-500 hover:bg-amber-600 flex items-center gap-2"
+                >
+                  <AlertTriangle className="w-4 h-4" strokeWidth={2} />
+                  Create CAPA
+                </button>
+              )}
+            {viewResultStudy?.passFail === 'Fail' &&
+              capaForStudy(viewResultStudy.id) && (
+                <button
+                  onClick={() => navigate('/capa')}
+                  className="mr-auto px-4 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold rounded-xl transition text-sm flex items-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" strokeWidth={2} />
+                  View CAPA
+                </button>
+              )}
+            <button
+              onClick={() => setViewResultStudy(null)}
+              className="px-4 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold rounded-xl transition text-sm"
+            >
+              Close
+            </button>
+          </>
         }
       >
         {viewResultStudy && (
