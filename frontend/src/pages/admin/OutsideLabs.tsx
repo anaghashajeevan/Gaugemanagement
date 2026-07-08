@@ -206,11 +206,12 @@ export default function OutsideLabs() {
   return (
     <Layout
       pageTitle="Outside Labs"
+      pageSubtitle="Manage accredited external calibration vendors and their scope"
+      pageIcon={FlaskConical}
       headerAction={
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-5 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition text-sm"
-          style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}
+          className="flex items-center gap-2 px-5 py-2.5 bg-white text-indigo-600 font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition text-sm"
         >
           <Plus className="w-4 h-4" strokeWidth={2.5} />
           Add Outside Lab

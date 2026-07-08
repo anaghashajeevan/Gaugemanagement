@@ -377,7 +377,7 @@ export default function Roles() {
   const deleteRole = roles.find((r) => r.id === deleteId);
 
   return (
-    <Layout pageTitle="Roles">
+    <Layout pageTitle="Roles" pageSubtitle="Configure role-based access levels across the system" pageIcon={ShieldCheck}>
       {/* Error */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">

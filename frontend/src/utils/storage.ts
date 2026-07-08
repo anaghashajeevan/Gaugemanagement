@@ -1410,6 +1410,52 @@ export const capaStorage = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
+// GAUGE QUARANTINE REASON — why is a gauge "Under Review"?
+// Not stored on the gauge itself; derived from the open CAPA (if any)
+// or the most recent failing Calibration/MSA record for that gauge.
+// ═══════════════════════════════════════════════════════════════════
+
+export function getQuarantineReason(gaugeId: string): string | null {
+  const openCapa = capaStorage
+    .getByGaugeId(gaugeId)
+    .find((c) => c.status === 'Open');
+
+  if (openCapa) {
+    return openCapa.sourceType === 'MSA'
+      ? 'Open CAPA — failed MSA study'
+      : 'Open CAPA — failed calibration';
+  }
+
+  const lastFailedCal = calibrationStorage
+    .getAll()
+    .filter((c) => c.gaugeId === gaugeId && c.result === 'Fail')
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+  const lastFailedMsa = msaStorage
+    .getAll()
+    .filter((m) => m.gaugeId === gaugeId && m.passFail === 'Fail')
+    .sort(
+      (a, b) =>
+        new Date(b.completedDate || b.createdDate).getTime() -
+        new Date(a.completedDate || a.createdDate).getTime()
+    )[0];
+
+  if (lastFailedCal && lastFailedMsa) {
+    const calTime = new Date(lastFailedCal.date).getTime();
+    const msaTime = new Date(
+      lastFailedMsa.completedDate || lastFailedMsa.createdDate
+    ).getTime();
+    return calTime >= msaTime
+      ? `Failed ${lastFailedCal.type} calibration`
+      : `Failed ${lastFailedMsa.studyType} study`;
+  }
+  if (lastFailedCal) return `Failed ${lastFailedCal.type} calibration`;
+  if (lastFailedMsa) return `Failed ${lastFailedMsa.studyType} study`;
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // CRUD — ISSUE/RETURN
 // ═══════════════════════════════════════════════════════════════════
 

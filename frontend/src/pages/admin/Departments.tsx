@@ -541,7 +541,7 @@ export default function Departments() {
   const deleteDept = departments.find((d) => d.id === deleteId);
 
   return (
-    <Layout pageTitle="Departments">
+    <Layout pageTitle="Departments" pageSubtitle="Manage organizational departments and locations" pageIcon={Building2}>
       {/* Error */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">

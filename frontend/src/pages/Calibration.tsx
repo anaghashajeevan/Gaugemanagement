@@ -24,9 +24,12 @@ import {
   AlertTriangle,
   FileText,
   Upload,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 
 type TabKey = 'Internal' | 'External';
+type ResultFilter = 'all' | 'Pass' | 'Fail';
 
 const emptyInternalForm = {
   gaugeId: '',
@@ -53,6 +56,7 @@ export default function Calibration() {
   );
   const [tab, setTab] = useState<TabKey>('Internal');
   const [search, setSearch] = useState('');
+  const [resultFilter, setResultFilter] = useState<ResultFilter>('all');
 
   // Internal modal
   const [intModalOpen, setIntModalOpen] = useState(false);
@@ -76,6 +80,20 @@ export default function Calibration() {
   const gauges = gaugeStorage.getAll();
   const standards = standardStorage.getAll();
   const vendors = vendorStorage.getAll();
+  const capas = capaStorage.getAll();
+
+  const capaForRecord = (recordId: string) =>
+    capas.find((c) => c.sourceType === 'Calibration' && c.sourceId === recordId);
+
+  const openCapaPrompt = (record: CalibrationRecord) => {
+    setCapaForm({
+      rootCause: '',
+      correctiveAction: '',
+      responsiblePerson: '',
+      targetDate: '',
+    });
+    setCapaPrompt(record);
+  };
 
   // ─── Vendors accredited for the selected gauge's type ─────────────
   const selectedExternalGauge = useMemo(
@@ -102,6 +120,9 @@ export default function Calibration() {
 
   const filtered = useMemo(() => {
     let list = records.filter((r) => r.type === tab);
+    if (resultFilter !== 'all') {
+      list = list.filter((r) => r.result === resultFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((r) => {
@@ -115,7 +136,7 @@ export default function Calibration() {
       });
     }
     return list;
-  }, [records, tab, search, gauges]);
+  }, [records, tab, resultFilter, search, gauges]);
 
   const getGaugeLabel = (gaugeId: string) => {
     const g = gauges.find((x) => x.id === gaugeId);
@@ -160,12 +181,12 @@ export default function Calibration() {
       nextDueDate: nextDueDate.toISOString().split('T')[0],
     });
 
-    // Update gauge
+    // Update gauge — quarantine it if the calibration failed
     if (gauge) {
       gaugeStorage.update(gauge.id, {
         lastCalibrationDate: intForm.date,
         nextDueDate: nextDueDate.toISOString().split('T')[0],
-        status: 'Available',
+        status: result === 'Fail' ? 'Under Review' : 'Available',
       });
     }
 
@@ -183,7 +204,7 @@ export default function Calibration() {
     setIntError('');
 
     if (result === 'Fail') {
-      setCapaPrompt(newRecord);
+      openCapaPrompt(newRecord);
     }
   };
 
@@ -263,6 +284,7 @@ export default function Calibration() {
 
     setCapaPrompt(null);
     setCapaForm({ rootCause: '', correctiveAction: '', responsiblePerson: '', targetDate: '' });
+    reload();
   };
 
   // ─── Table Columns ────────────────────────────────────────────────
@@ -328,6 +350,32 @@ export default function Calibration() {
     },
     { header: 'Technician', accessor: 'technician' },
     { header: 'Next Due', accessor: 'nextDueDate' },
+    {
+      header: 'Actions',
+      width: '90px',
+      align: 'left' as const,
+      cell: (row) => {
+        if (row.result !== 'Fail') return null;
+        const existingCapa = capaForRecord(row.id);
+        return existingCapa ? (
+          <button
+            onClick={() => navigate('/capa')}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition text-gray-400"
+            title="View CAPA"
+          >
+            <ExternalLink className="w-4 h-4" strokeWidth={2} />
+          </button>
+        ) : (
+          <button
+            onClick={() => openCapaPrompt(row)}
+            className="p-1.5 hover:bg-amber-50 rounded-lg transition text-amber-500"
+            title="Create CAPA"
+          >
+            <AlertTriangle className="w-4 h-4" strokeWidth={2} />
+          </button>
+        );
+      },
+    },
   ];
 
   // ─── Stats ────────────────────────────────────────────────────────
@@ -336,14 +384,17 @@ export default function Calibration() {
   const failCount = tabRecords.filter((r) => r.result === 'Fail').length;
 
   return (
-    <Layout pageTitle="Calibration">
+    <Layout pageTitle="Calibration" pageSubtitle="Record and track internal and external gauge calibrations" pageIcon={ClipboardCheck}>
       {/* ─── Tabs ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div className="flex gap-1 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100">
           {(['Internal', 'External'] as TabKey[]).map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => {
+                setTab(t);
+                setResultFilter('all');
+              }}
               className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
                 tab === t
                   ? 'text-white shadow-md'
@@ -364,6 +415,15 @@ export default function Calibration() {
         </div>
 
         <div className="flex items-center gap-3">
+          {resultFilter !== 'all' && (
+            <button
+              onClick={() => setResultFilter('all')}
+              className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold hover:bg-indigo-100 transition"
+            >
+              {resultFilter}
+              <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+            </button>
+          )}
           <div className="relative">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -399,34 +459,45 @@ export default function Calibration() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           {
+            key: 'all' as ResultFilter,
             label: 'Total Records',
             value: tabRecords.length,
             accent: 'from-indigo-500 to-purple-500',
           },
           {
+            key: 'Pass' as ResultFilter,
             label: 'Pass',
             value: passCount,
             accent: 'from-emerald-500 to-teal-500',
           },
           {
+            key: 'Fail' as ResultFilter,
             label: 'Fail',
             value: failCount,
             accent: 'from-red-500 to-rose-500',
           },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden"
-          >
-            <div
-              className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`}
-            />
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
-              {s.label}
-            </p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">{s.value}</p>
-          </div>
-        ))}
+        ].map((s) => {
+          const active = resultFilter === s.key;
+          return (
+            <button
+              key={s.label}
+              onClick={() => setResultFilter(s.key)}
+              className={`w-full text-left bg-white rounded-xl p-4 shadow-sm border relative overflow-hidden transition hover:shadow-md ${
+                active
+                  ? 'border-indigo-300 ring-2 ring-indigo-100'
+                  : 'border-gray-100'
+              }`}
+            >
+              <div
+                className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`}
+              />
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
+                {s.label}
+              </p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{s.value}</p>
+            </button>
+          );
+        })}
       </div>
 
       {/* ─── Table ────────────────────────────────────────────────── */}
@@ -785,8 +856,10 @@ export default function Calibration() {
             className="w-5 h-5 flex-shrink-0 mt-0.5"
             strokeWidth={2}
           />
-          This calibration <strong>FAILED</strong>. It is recommended to create a
-          CAPA (Corrective & Preventive Action).
+          <span>
+            This calibration <strong>FAILED</strong>. It is recommended to create a
+            CAPA (Corrective & Preventive Action).
+          </span>
         </div>
 
         <div className="space-y-4">

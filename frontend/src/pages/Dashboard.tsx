@@ -1,82 +1,3 @@
-// import Layout from '../components/Layout';
-// import { useAuth } from '../context/AuthContext';
-
-// export default function Dashboard() {
-//   const { user } = useAuth();
-
-//   const stats = [
-//     { label: 'Total Gauges', value: '—', color: 'bg-blue-100 text-blue-600', icon: '🔧' },
-//     { label: 'Due This Week', value: '—', color: 'bg-yellow-100 text-yellow-600', icon: '⏰' },
-//     { label: 'Overdue', value: '—', color: 'bg-red-100 text-red-600', icon: '⚠️' },
-//     { label: 'Open CAPAs', value: '—', color: 'bg-purple-100 text-purple-600', icon: '🚩' },
-//   ];
-
-//   return (
-//     <Layout pageTitle="Dashboard">
-//       {/* Welcome Banner */}
-//       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl p-6 mb-6 shadow">
-//         <h2 className="text-2xl font-bold">Welcome back, {user?.full_name}! 👋</h2>
-//         <p className="text-blue-100 mt-1">
-//           {user?.role_name} · {user?.department_name || 'No department assigned'}
-//         </p>
-//       </div>
-
-//       {/* Stats */}
-//       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-//         {stats.map((stat) => (
-//           <div key={stat.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-//             <div className="flex justify-between items-start">
-//               <div>
-//                 <p className="text-sm text-gray-500">{stat.label}</p>
-//                 <p className="text-3xl font-bold text-gray-800 mt-1">{stat.value}</p>
-//               </div>
-//               <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${stat.color}`}>
-//                 {stat.icon}
-//               </div>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
-
-//       {/* Roadmap Card */}
-//       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-//         <h3 className="text-lg font-semibold text-gray-800 mb-4">📋 Module Implementation Roadmap</h3>
-//         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-//           <div>
-//             <h4 className="font-semibold text-green-600 mb-2">✅ Complete</h4>
-//             <ul className="text-sm text-gray-600 space-y-1">
-//               <li>• Authentication & Login</li>
-//               <li>• JWT Token Refresh</li>
-//               <li>• Role-based Access</li>
-//               <li>• Change Password</li>
-//             </ul>
-//           </div>
-//           <div>
-//             <h4 className="font-semibold text-yellow-600 mb-2">⏳ Next Up</h4>
-//             <ul className="text-sm text-gray-600 space-y-1">
-//               <li>• Department Master</li>
-//               <li>• Gauge Master</li>
-//               <li>• Reference Standard</li>
-//               <li>• User Management UI</li>
-//             </ul>
-//           </div>
-//           <div>
-//             <h4 className="font-semibold text-gray-500 mb-2">📅 Planned</h4>
-//             <ul className="text-sm text-gray-600 space-y-1">
-//               <li>• Internal / External Calibration</li>
-//               <li>• MSA Studies (GR&R, Linearity)</li>
-//               <li>• CAPA Module</li>
-//               <li>• Issue / Return Tracker</li>
-//               <li>• Auto Emailer</li>
-//             </ul>
-//           </div>
-//         </div>
-//       </div>
-//     </Layout>
-//   );
-// }
-
-
 // src/pages/Dashboard.tsx
 
 import { useMemo } from 'react';
@@ -93,6 +14,18 @@ import {
   auditStorage,
 } from '../utils/storage';
 import {
+  classifyDueDate,
+  computeComplianceSummary,
+  computeWorkloadBuckets,
+  computeDepartmentRisk,
+  computeCapaSummary,
+} from '../utils/dashboardAnalytics';
+import DashboardSectionHeader from '../components/dashboard/DashboardSectionHeader';
+import ComplianceDonutChart from '../components/dashboard/ComplianceDonutChart';
+import WorkloadBarChart from '../components/dashboard/WorkloadBarChart';
+import DepartmentRiskChart from '../components/dashboard/DepartmentRiskChart';
+import CapaStatusChart from '../components/dashboard/CapaStatusChart';
+import {
   Gauge,
   Clock,
   AlertTriangle,
@@ -105,13 +38,15 @@ import {
   FileText,
   Plus,
   CheckCircle2,
-  Circle,
-  Loader2,
   Sparkles,
   Calendar,
   Activity,
   ArrowLeftRight,
   Package,
+  ShieldCheck,
+  CalendarClock,
+  Building2,
+  ShieldAlert,
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -127,21 +62,16 @@ export default function Dashboard() {
   const auditLogs = auditStorage.getAll();
 
   // ─── Computed Stats ───────────────────────────────────────────────
-  const getDueStatus = (dateStr: string) => {
-    if (!dateStr) return 'Unknown';
-    const diff = (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-    if (diff < 0) return 'Overdue';
-    if (diff <= 7) return 'Due This Week';
-    if (diff <= 30) return 'Due Soon';
-    return 'Up to Date';
-  };
-
+  // Due-date classification is shared with the analytics charts via
+  // classifyDueDate() so KPI cards, Attention Required, and the charts can
+  // never disagree — and invalid/unparsable dates safely fall into 'Unknown'
+  // instead of silently defaulting to 'Up to Date'.
   const totalGauges = gauges.length;
   const dueThisWeek = gauges.filter(
-    (g) => g.status !== 'Scrapped' && getDueStatus(g.nextDueDate) === 'Due This Week'
+    (g) => g.status !== 'Scrapped' && classifyDueDate(g.nextDueDate) === 'Due This Week'
   ).length;
   const overdue = gauges.filter(
-    (g) => g.status !== 'Scrapped' && getDueStatus(g.nextDueDate) === 'Overdue'
+    (g) => g.status !== 'Scrapped' && classifyDueDate(g.nextDueDate) === 'Overdue'
   ).length;
   const openCAPAs = capas.filter((c) => c.status === 'Open').length;
   const currentlyIssued = issueLogs.filter((l) => l.status === 'Issued').length;
@@ -149,10 +79,22 @@ export default function Dashboard() {
   const failedMSA = msaStudies.filter((m) => m.passFail === 'Fail').length;
   const availableGauges = gauges.filter((g) => g.status === 'Available').length;
 
+  const departmentCount = useMemo(
+    () => new Set(gauges.map((g) => g.department).filter(Boolean)).size,
+    [gauges]
+  );
+
+  // ─── Analytics Chart Datasets ───────────────────────────────────────
+  const complianceSummary = useMemo(() => computeComplianceSummary(gauges), [gauges]);
+  const workloadBuckets = useMemo(() => computeWorkloadBuckets(gauges), [gauges]);
+  const departmentRisk = useMemo(() => computeDepartmentRisk(gauges), [gauges]);
+  const capaSummary = useMemo(() => computeCapaSummary(capas), [capas]);
+
   const stats = [
     {
       label: 'Total Gauges',
       value: totalGauges,
+      sub: departmentCount > 0 ? `Across ${departmentCount} department${departmentCount === 1 ? '' : 's'}` : 'No departments assigned',
       accent: 'from-indigo-500 to-purple-500',
       bgLight: 'bg-indigo-50',
       textAccent: 'text-indigo-600',
@@ -162,6 +104,7 @@ export default function Dashboard() {
     {
       label: 'Due This Week',
       value: dueThisWeek,
+      sub: 'Within the next 7 days',
       accent: 'from-amber-500 to-yellow-500',
       bgLight: 'bg-amber-50',
       textAccent: 'text-amber-600',
@@ -171,6 +114,7 @@ export default function Dashboard() {
     {
       label: 'Overdue',
       value: overdue,
+      sub: overdue > 0 ? 'Immediate action required' : 'All caught up',
       accent: 'from-red-500 to-rose-500',
       bgLight: 'bg-red-50',
       textAccent: 'text-red-600',
@@ -180,6 +124,7 @@ export default function Dashboard() {
     {
       label: 'Open CAPAs',
       value: openCAPAs,
+      sub: capaSummary.overdue > 0 ? `${capaSummary.overdue} overdue` : 'No overdue actions',
       accent: 'from-emerald-500 to-teal-500',
       bgLight: 'bg-emerald-50',
       textAccent: 'text-emerald-600',
@@ -196,6 +141,7 @@ export default function Dashboard() {
       icon: CheckCircle2,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
+      border: 'border-l-emerald-300',
     },
     {
       label: 'Issued',
@@ -203,6 +149,7 @@ export default function Dashboard() {
       icon: Package,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
+      border: 'border-l-blue-300',
     },
     {
       label: 'Failed Cal.',
@@ -210,6 +157,7 @@ export default function Dashboard() {
       icon: AlertOctagon,
       color: 'text-red-600',
       bg: 'bg-red-50',
+      border: 'border-l-red-300',
     },
     {
       label: 'Failed MSA',
@@ -217,24 +165,25 @@ export default function Dashboard() {
       icon: BarChart3,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
+      border: 'border-l-amber-300',
     },
   ];
 
   // ─── Quick Actions ────────────────────────────────────────────────
   const quickActions = [
-    { label: 'New Calibration', color: 'from-indigo-500 to-purple-500', icon: ClipboardCheck, path: '/calibration' },
-    { label: 'Issue Gauge', color: 'from-emerald-500 to-teal-500', icon: Send, path: '/issue-return' },
-    { label: 'Start MSA Study', color: 'from-blue-500 to-cyan-500', icon: BarChart3, path: '/msa' },
-    { label: 'Open CAPA', color: 'from-amber-500 to-yellow-500', icon: AlertOctagon, path: '/capa' },
-    { label: 'View Reports', color: 'from-pink-500 to-rose-500', icon: FileText, path: '/reports' },
-    { label: 'Add Gauge', color: 'from-violet-500 to-purple-500', icon: Plus, path: '/gauges' },
+    { label: 'New Calibration', icon: ClipboardCheck, tint: 'bg-indigo-50 text-indigo-600', path: '/calibration' },
+    { label: 'Issue Gauge', icon: Send, tint: 'bg-emerald-50 text-emerald-600', path: '/issue-return' },
+    { label: 'Start MSA Study', icon: BarChart3, tint: 'bg-blue-50 text-blue-600', path: '/msa' },
+    { label: 'Open CAPA', icon: AlertOctagon, tint: 'bg-amber-50 text-amber-600', path: '/capa' },
+    { label: 'View Reports', icon: FileText, tint: 'bg-rose-50 text-rose-600', path: '/reports' },
+    { label: 'Add Gauge', icon: Plus, tint: 'bg-violet-50 text-violet-600', path: '/gauges' },
   ];
 
   // ─── Overdue Gauges List ──────────────────────────────────────────
   const overdueGauges = useMemo(
     () =>
       gauges
-        .filter((g) => g.status !== 'Scrapped' && getDueStatus(g.nextDueDate) === 'Overdue')
+        .filter((g) => g.status !== 'Scrapped' && classifyDueDate(g.nextDueDate) === 'Overdue')
         .sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime())
         .slice(0, 5),
     [gauges]
@@ -247,7 +196,7 @@ export default function Dashboard() {
         .filter(
           (g) =>
             g.status !== 'Scrapped' &&
-            ['Due This Week', 'Due Soon'].includes(getDueStatus(g.nextDueDate))
+            ['Due This Week', 'Due Soon'].includes(classifyDueDate(g.nextDueDate))
         )
         .sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime())
         .slice(0, 5),
@@ -257,7 +206,7 @@ export default function Dashboard() {
   // ─── Recent Calibrations ─────────────────────────────────────────
   const recentCalibrations = useMemo(
     () =>
-      calibrations
+      [...calibrations]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 5),
     [calibrations]
@@ -301,7 +250,7 @@ export default function Dashboard() {
       <div
         className="relative rounded-2xl p-6 mb-6 shadow-lg overflow-hidden"
         style={{
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
+          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
         }}
       >
         <div
@@ -312,8 +261,15 @@ export default function Dashboard() {
           }}
         />
 
-        <div className="absolute -right-8 -top-8 w-40 h-40 bg-white/10 rounded-full" />
-        <div className="absolute -right-16 -bottom-16 w-56 h-56 bg-white/5 rounded-full" />
+        {/* Subtle dot-grid texture for a premium, non-decorative feel */}
+        <div
+          className="absolute inset-0 opacity-[0.07] pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }}
+        />
+        <div className="absolute -right-10 -top-10 w-56 h-56 bg-white/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -323,13 +279,13 @@ export default function Dashboard() {
                 Welcome back
               </span>
             </div>
-            <h2 className="text-3xl font-bold text-white mb-1">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-1">
               {user?.full_name}
             </h2>
             <p className="text-indigo-100 text-sm">
               {user?.role_name} · {user?.department_name || 'No department assigned'}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <span className="px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-xs rounded-full font-medium flex items-center gap-1.5">
                 <Activity className="w-3 h-3" strokeWidth={2.5} />
                 {totalGauges} Gauges Managed
@@ -353,7 +309,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => navigate('/calibration')}
-            className="bg-white text-indigo-600 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition flex items-center gap-2 hover:scale-105"
+            className="bg-white text-indigo-600 font-semibold px-5 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition flex items-center gap-2 hover:scale-105"
           >
             <Plus className="w-5 h-5" strokeWidth={2.5} />
             New Calibration
@@ -369,30 +325,34 @@ export default function Dashboard() {
             <div
               key={stat.label}
               onClick={() => navigate(stat.path)}
-              className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition group relative overflow-hidden cursor-pointer"
+              className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition group relative overflow-hidden cursor-pointer"
             >
               <div
                 className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${stat.accent}`}
               />
 
               <div className="flex justify-between items-start">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
                     {stat.label}
                   </p>
-                  <p className="text-3xl font-bold text-gray-800 mt-2">
+                  <p className="text-[32px] leading-tight font-bold text-gray-800 mt-2">
                     {stat.value}
                   </p>
-                  <div className={`flex items-center gap-1 mt-1 ${stat.textAccent} text-xs font-medium`}>
-                    View details
-                    <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
-                  </div>
+                  <p className="text-xs text-gray-400 mt-1 truncate">{stat.sub}</p>
                 </div>
                 <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.bgLight} ${stat.textAccent} group-hover:scale-110 transition`}
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.bgLight} ${stat.textAccent} group-hover:scale-110 transition flex-shrink-0`}
                 >
                   <Icon className="w-6 h-6" strokeWidth={2} />
                 </div>
+              </div>
+
+              <div
+                className={`flex items-center gap-1 mt-3 ${stat.textAccent} text-xs font-medium opacity-0 group-hover:opacity-100 transition`}
+              >
+                View details
+                <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
               </div>
             </div>
           );
@@ -400,24 +360,94 @@ export default function Dashboard() {
       </div>
 
       {/* ─── Secondary Stats Row ───────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         {secondaryStats.map((s) => {
           const Icon = s.icon;
           return (
             <div
               key={s.label}
-              className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-3"
+              className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 border-l-2 ${s.border} flex items-center gap-3 hover:shadow-md transition`}
             >
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${s.bg} ${s.color}`}>
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${s.bg} ${s.color} flex-shrink-0`}>
                 <Icon className="w-4 h-4" strokeWidth={2} />
               </div>
-              <div>
-                <p className="text-xs text-gray-500 font-semibold">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500 font-semibold truncate">{s.label}</p>
                 <p className="text-xl font-bold text-gray-800">{s.value}</p>
               </div>
             </div>
           );
         })}
+      </div>
+
+      {/* ─── Analytics Overview ─────────────────────────────────────── */}
+      <DashboardSectionHeader
+        title="Analytics Overview"
+        subtitle="Calibration health, upcoming workload, and quality risk at a glance"
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Calibration Compliance Overview */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-1">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="w-4 h-4" strokeWidth={2} />
+              </span>
+              Calibration Schedule Compliance
+            </h3>
+          </div>
+          <p className="text-xs text-gray-400 mb-3 ml-9">Active gauge schedule validity</p>
+          <ComplianceDonutChart summary={complianceSummary} />
+        </div>
+
+        {/* Upcoming Calibration Workload */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                <CalendarClock className="w-4 h-4" strokeWidth={2} />
+              </span>
+              Upcoming Calibration Workload
+            </h3>
+            <span className="text-xs text-gray-400">Next 6 months</span>
+          </div>
+          <p className="text-xs text-gray-400 mb-2 ml-9">By calibration due date</p>
+          <WorkloadBarChart buckets={workloadBuckets} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Department Risk Distribution */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <span className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-4 h-4" strokeWidth={2} />
+              </span>
+              Calibration Risk by Department
+            </h3>
+            {departmentRisk.length > 0 && (
+              <span className="text-xs text-gray-400">{departmentRisk.length} departments</span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mb-2 ml-9">Schedule exposure across departments</p>
+          <DepartmentRiskChart rows={departmentRisk} />
+        </div>
+
+        {/* CAPA Status Overview */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-1">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                <ShieldAlert className="w-4 h-4" strokeWidth={2} />
+              </span>
+              CAPA Status
+            </h3>
+          </div>
+          <p className="text-xs text-gray-400 mb-3 ml-9">Corrective &amp; preventive actions</p>
+          <CapaStatusChart summary={capaSummary} />
+        </div>
       </div>
 
       {/* ─── Three Column Layout ───────────────────────────────────── */}
@@ -443,10 +473,10 @@ export default function Dashboard() {
                 <button
                   key={action.label}
                   onClick={() => navigate(action.path)}
-                  className="p-3 rounded-lg border border-gray-200 hover:shadow-md transition text-left group hover:border-indigo-200"
+                  className="p-3 rounded-lg border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition text-left group"
                 >
                   <div
-                    className={`w-9 h-9 rounded-lg bg-gradient-to-br ${action.color} flex items-center justify-center text-white mb-2 shadow-sm group-hover:scale-110 transition`}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${action.tint} group-hover:scale-105 transition`}
                   >
                     <Icon className="w-4 h-4" strokeWidth={2} />
                   </div>
@@ -492,9 +522,12 @@ export default function Dashboard() {
                   onClick={() => navigate(`/gauges/${g.id}`)}
                   className="flex items-center justify-between p-2.5 rounded-lg bg-red-50/50 border border-red-100 hover:bg-red-50 cursor-pointer transition"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-gray-800 truncate">{g.gaugeCode}</p>
-                    <p className="text-xs text-gray-500 truncate">{g.name}</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" strokeWidth={2} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-800 truncate">{g.gaugeCode}</p>
+                      <p className="text-xs text-gray-500 truncate">{g.name}</p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs text-red-600 font-medium">{g.nextDueDate}</span>
@@ -509,9 +542,12 @@ export default function Dashboard() {
                   onClick={() => navigate(`/gauges/${g.id}`)}
                   className="flex items-center justify-between p-2.5 rounded-lg bg-amber-50/50 border border-amber-100 hover:bg-amber-50 cursor-pointer transition"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-gray-800 truncate">{g.gaugeCode}</p>
-                    <p className="text-xs text-gray-500 truncate">{g.name}</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" strokeWidth={2} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-800 truncate">{g.gaugeCode}</p>
+                      <p className="text-xs text-gray-500 truncate">{g.name}</p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs text-amber-600 font-medium">{g.nextDueDate}</span>
@@ -546,7 +582,7 @@ export default function Dashboard() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[280px] overflow-y-auto">
+            <div className="space-y-1 max-h-[280px] overflow-y-auto">
               {recentActivity.map((log) => (
                 <div
                   key={log.id}
@@ -591,6 +627,11 @@ export default function Dashboard() {
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <ClipboardCheck className="w-5 h-5 text-indigo-500" strokeWidth={2} />
               Recent Calibrations
+              {recentCalibrations.length > 0 && (
+                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full">
+                  {recentCalibrations.length}
+                </span>
+              )}
             </h3>
             <button
               onClick={() => navigate('/calibration')}
@@ -662,107 +703,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
-      {/* ─── Module Roadmap ─────────────────────────────────
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div
-          className="h-1"
-          style={{
-            background:
-              'linear-gradient(90deg, #4338ca 0%, #7c3aed 25%, #a855f7 45%, #10b981 70%, #eab308 100%)',
-          }}
-        />
-
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <ClipboardCheck className="w-5 h-5 text-indigo-500" strokeWidth={2} />
-              Module Implementation Roadmap
-            </h3>
-            <span className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full font-semibold flex items-center gap-1.5">
-              <CheckCircle2 className="w-3 h-3" strokeWidth={2.5} />
-              Demo Ready
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white">
-                  <CheckCircle2 className="w-5 h-5" strokeWidth={2.5} />
-                </div>
-                <h4 className="font-bold text-emerald-700">Complete</h4>
-              </div>
-              <ul className="text-sm text-gray-700 space-y-2">
-                {[
-                  'Authentication & Login',
-                  'Role-based Access Control',
-                  'Gauge Master (CRUD)',
-                  'Internal Calibration',
-                  'External Calibration',
-                  'MSA Studies (4 types)',
-                  'CAPA Module',
-                  'Issue / Return Tracker',
-                  'Reports & CSV Export',
-                  'Admin: Users, Roles, Depts',
-                  'Audit Trail',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-white">
-                  <Clock className="w-5 h-5" strokeWidth={2.5} />
-                </div>
-                <h4 className="font-bold text-amber-700">Next Up</h4>
-              </div>
-              <ul className="text-sm text-gray-700 space-y-2">
-                {[
-                  'Dashboard Charts & Graphs',
-                  'Email Notifications',
-                  'Certificate File Upload',
-                  'Bulk Import/Export',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <ArrowUpRight className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white">
-                  <Calendar className="w-5 h-5" strokeWidth={2.5} />
-                </div>
-                <h4 className="font-bold text-indigo-700">Planned</h4>
-              </div>
-              <ul className="text-sm text-gray-700 space-y-2">
-                {[
-                  'Mobile Responsive Layout',
-                  'PDF Report Generation',
-                  'Barcode/QR Scanning',
-                  'Auto-reminder Scheduler',
-                  'Multi-plant Support',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <Circle className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-      ──────────────────────────────────────────────────────────────── */}
     </Layout>
   );
 }

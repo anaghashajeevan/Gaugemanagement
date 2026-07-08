@@ -604,7 +604,7 @@ export default function AuditTrail() {
   ];
 
   return (
-    <Layout pageTitle="Audit Trail">
+    <Layout pageTitle="Audit Trail" pageSubtitle="Review a complete history of system actions and changes" pageIcon={ScrollText}>
       {/* Error */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">
