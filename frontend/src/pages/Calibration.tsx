@@ -987,6 +987,20 @@ export default function Calibration() {
   const gauges = gaugeStorage.getAll();
   const standards = standardStorage.getAll();
   const vendors = vendorStorage.getAll();
+  const capas = capaStorage.getAll();
+
+  const capaForRecord = (recordId: string) =>
+    capas.find((c) => c.sourceType === 'Calibration' && c.sourceId === recordId);
+
+  const openCapaPrompt = (record: CalibrationRecord) => {
+    setCapaForm({
+      rootCause: '',
+      correctiveAction: '',
+      responsiblePerson: '',
+      targetDate: '',
+    });
+    setCapaPrompt(record);
+  };
 
   // ─── Vendors accredited for the selected gauge's type ─────────────
   const selectedExternalGauge = useMemo(
@@ -1316,6 +1330,32 @@ export default function Calibration() {
     },
     { header: 'Technician', accessor: 'technician' },
     { header: 'Next Due', accessor: 'nextDueDate' },
+    {
+      header: 'Actions',
+      width: '90px',
+      align: 'left' as const,
+      cell: (row) => {
+        if (row.result !== 'Fail') return null;
+        const existingCapa = capaForRecord(row.id);
+        return existingCapa ? (
+          <button
+            onClick={() => navigate('/capa')}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition text-gray-400"
+            title="View CAPA"
+          >
+            <ExternalLink className="w-4 h-4" strokeWidth={2} />
+          </button>
+        ) : (
+          <button
+            onClick={() => openCapaPrompt(row)}
+            className="p-1.5 hover:bg-amber-50 rounded-lg transition text-amber-500"
+            title="Create CAPA"
+          >
+            <AlertTriangle className="w-4 h-4" strokeWidth={2} />
+          </button>
+        );
+      },
+    },
   ];
 
   // ─── Stats ────────────────────────────────────────────────────────
