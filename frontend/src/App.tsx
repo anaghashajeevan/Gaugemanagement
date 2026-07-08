@@ -68,6 +68,8 @@ import Roles from './pages/admin/Roles';
 import Departments from './pages/admin/Departments';
 import OutsideLabs from './pages/admin/OutsideLabs';
 import AuditTrail from './pages/admin/AuditTrail';
+import Locations from './pages/admin/Locations';
+import Parts from './pages/admin/Parts';
 
 function AppRoutes() {
   useEffect(() => {
@@ -131,7 +133,12 @@ function AppRoutes() {
       <Route path="/admin/audit" element={
         <ProtectedRoute requiredRole="admin"><AuditTrail /></ProtectedRoute>
       } />
-
+      <Route path="/admin/locations" element={
+  <ProtectedRoute requiredRole="admin"><Locations /></ProtectedRoute>
+} />
+     <Route path="/admin/parts" element={
+  <ProtectedRoute requiredRole="admin"><Parts /></ProtectedRoute>
+} />
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

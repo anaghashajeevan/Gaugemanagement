@@ -539,27 +539,29 @@ export default function GaugeHistory() {
   // ─── MSA Columns ─────────────────────────────────────────────────
   // Fixed: use createdDate not date, operatorNames not operators,
   //        handle optional resultValue and passFail
+    // ─── MSA Columns (with real result values) ────────────────────────
+  const formatMSAResult = (r: MSAStudy) => {
+    if (r.resultValue === undefined) return '—';
+    if (r.studyType === 'GRR') return `${r.grrPercent?.toFixed(2)}%`;
+    if (r.studyType === 'Uncertainty') return `±${r.expandedUncertainty?.toFixed(4)}`;
+    if (r.studyType === 'Bias') return r.biasValue?.toFixed(4);
+    if (r.studyType === 'Linearity') return `Max: ${r.linearityMaxBias?.toFixed(4)}`;
+    return String(r.resultValue);
+  };
+
   const msaCols: Column<MSAStudy>[] = [
-    {
-      header: 'Date',
-      cell: (row) => <span>{row.createdDate}</span>,
-    },
-    {
-      header: 'Study Type',
-      cell: (row) => <StatusBadge status={row.studyType} />,
-    },
+    { header: 'Date', cell: (row) => <span>{row.createdDate}</span> },
+    { header: 'Study Type', cell: (row) => <StatusBadge status={row.studyType} /> },
     {
       header: 'Operators',
       cell: (row) => (
-        <span className="text-sm">
-          {row.operatorNames.join(', ')}
-        </span>
+        <span className="text-sm">{row.operatorNames.join(', ')}</span>
       ),
     },
     {
       header: 'Config',
       cell: (row) => (
-        <span className="text-xs text-gray-500">
+        <span className="text-sm text-gray-500">
           {row.parts.length} parts × {row.numberOfTrials} trials
         </span>
       ),
@@ -567,27 +569,13 @@ export default function GaugeHistory() {
     {
       header: 'Result',
       cell: (row) => (
-        <span className="font-semibold font-mono">
-          {row.resultValue !== undefined && row.resultValue !== null
-            ? row.studyType === 'GRR'
-              ? `${row.resultValue}%`
-              : String(row.resultValue)
-            : '—'}
-        </span>
+        <span className="font-semibold font-mono text-sm">{formatMSAResult(row)}</span>
       ),
     },
-    {
-      header: 'Status',
-      cell: (row) => <StatusBadge status={row.status} />,
-    },
+    { header: 'Status', cell: (row) => <StatusBadge status={row.status} /> },
     {
       header: 'Pass/Fail',
-      cell: (row) =>
-        row.passFail ? (
-          <StatusBadge status={row.passFail} />
-        ) : (
-          <span className="text-xs text-gray-400">—</span>
-        ),
+      cell: (row) => row.passFail ? <StatusBadge status={row.passFail} /> : <span className="text-xs text-gray-400">—</span>,
     },
   ];
 
