@@ -662,6 +662,8 @@ export interface CalibrationRecord {
   result: 'Pass' | 'Fail';
   certificateNo?: string;
   certificateValidUntil?: string;
+  certificateFile?: string;      
+  certificateFileName?: string; 
   technician: string;
   nextDueDate: string;
 }
