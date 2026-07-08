@@ -934,7 +934,6 @@ import {
   ExternalLink,
   X,
   Download,
-  X,
 } from 'lucide-react';
 
 type TabKey = 'Internal' | 'External';
@@ -1223,15 +1222,6 @@ export default function Calibration() {
     setCapaPrompt(null);
     setCapaForm({ rootCause: '', correctiveAction: '', responsiblePerson: '', targetDate: '' });
     reload();
-  };
-
-  // ─── Certificate download handler ─────────────────────────────────
-  const downloadCertificate = (record: CalibrationRecord) => {
-    if (!record.certificateFile || !record.certificateFileName) return;
-    const link = document.createElement('a');
-    link.href = record.certificateFile;
-    link.download = record.certificateFileName;
-    link.click();
   };
 
   // ─── Certificate download handler ─────────────────────────────────
