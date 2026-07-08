@@ -673,7 +673,6 @@ export interface MSAOperatorMeasurement {
   data: number[][]; // [partIndex][trialIndex]
   submittedAt?: string;
 }
-
 export interface MSAStudy {
   id: string;
   gaugeId: string;
@@ -682,33 +681,72 @@ export interface MSAStudy {
   // Setup
   operatorIds: string[];
   operatorNames: string[];
-  parts: string[];
+  partIds: string[];             // NEW — Part IDs from Part master
+  parts: string[];               // Part names (for display/backward compat)
   numberOfTrials: number;
 
-  // For Linearity
+  // Linearity/Bias — auto-pulled from selected Parts (their trueValues)
   referenceValues?: number[];
 
-  // For Bias
+  // For Bias specifically (single reference)
   biasReferenceValue?: number;
   biasNumberOfReadings?: number;
 
-  // For Uncertainty
-  grrComponent?: number;
-  stdUncertainty?: number;
+  // For Uncertainty — link to source GRR study + additional components
+  linkedGrrStudyId?: string;
+  standardUncertainty?: number;  // From calibration cert
+  resolution?: number;           // Gauge resolution
 
   // Status & Measurements
   status: 'Pending Measurements' | 'In Progress' | 'Completed' | 'Failed';
   measurements: MSAOperatorMeasurement[];
 
-  // Calculated Result
-  resultValue?: number;
+  // ─── DETAILED CALCULATION RESULTS ─────────────────────────────
+  resultValue?: number;          // Primary result (%GRR / bias / linearity max dev / U)
   passFail?: 'Pass' | 'Borderline' | 'Fail';
+
+  // GRR specific
+  ev?: number;                   // Equipment Variation (raw)
+  av?: number;                   // Appraiser Variation (raw)
+  grr?: number;                  // GRR (raw)
+  pv?: number;                   // Part Variation (raw)
+  tv?: number;                   // Total Variation (raw)
+  evPercent?: number;            // %EV
+  avPercent?: number;            // %AV
+  grrPercent?: number;           // %GRR
+  pvPercent?: number;            // %PV
+  ndc?: number;                  // Number of Distinct Categories
+
+  // Bias specific
+  biasValue?: number;            // The calculated bias
+  biasTStatistic?: number;       // t-statistic
+  biasSignificant?: boolean;     // Is bias statistically significant?
+  biasStdDev?: number;
+
+  // Linearity specific
+  linearitySlope?: number;
+  linearityIntercept?: number;
+  linearityRSquared?: number;
+  linearityMaxBias?: number;
+  linearityPointResults?: {
+    referenceValue: number;
+    avgMeasured: number;
+    bias: number;
+  }[];
+
+  // Uncertainty specific
+  uRepeatability?: number;       // u from EV
+  uReproducibility?: number;     // u from AV
+  uReference?: number;           // u from standard
+  uResolution?: number;          // u from resolution
+  combinedUncertainty?: number;  // u_c
+  expandedUncertainty?: number;  // U = k × u_c
+  coverageFactor?: number;       // k (usually 2)
 
   createdBy: string;
   createdDate: string;
   completedDate?: string;
 }
-
 export interface CAPA {
   id: string;
   sourceType: 'Calibration' | 'MSA';
@@ -763,11 +801,27 @@ export interface Operator {
 
 export interface Part {
   id: string;
-  partName: string;
-  partNumber: string;
+  partName: string;              // "Part A - Lower Extreme"
+  partNumber: string;            // "P-001"
   description: string;
+  specification: string;         // "25.000 ±0.050 mm"
+  upperSpecLimit: number;        // 25.050
+  lowerSpecLimit: number;        // 24.950
+  tolerance: number;             // 0.100
+  nominalValue: number;          // 25.000
+  trueValue: number;             // 24.952 (known reference value)
+  characteristic: string;        // "Shaft Diameter"
+  isActive: boolean;
 }
 
+export interface Location {
+  id: string;
+  name: string;
+  departmentId: string;
+  departmentName: string;
+  description: string;
+  isActive: boolean;
+}
 // ═══════════════════════════════════════════════════════════════════
 // STORAGE KEYS
 // ═══════════════════════════════════════════════════════════════════
@@ -777,14 +831,15 @@ const KEYS = {
   standards: 'gm_standards',
   vendors: 'gm_vendors',
   calibrations: 'gm_calibrations',
-  msa: 'gm_msa_v2',
+  msa: 'gm_msa_v3',
   capa: 'gm_capa',
   issueReturn: 'gm_issue_return',
   users: 'gm_users',
   departments: 'gm_departments',
   audit: 'gm_audit',
   operators: 'gm_operators',
-  parts: 'gm_parts',
+  parts: 'gm_parts_v2', 
+  locations: 'gm_locations',
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -841,19 +896,121 @@ const seedOperators: Operator[] = [
 ];
 
 // ─── Parts ──────────────────────────────────────────────────────────
+// ─── Seed Parts (with real true values for MSA calculations) ────────
 const seedParts: Part[] = [
-  { id: 'pt1', partName: 'P1', partNumber: 'PN-001', description: 'Crankshaft Bearing Housing' },
-  { id: 'pt2', partName: 'P2', partNumber: 'PN-002', description: 'Cylinder Head Bore' },
-  { id: 'pt3', partName: 'P3', partNumber: 'PN-003', description: 'Piston Pin Hole' },
-  { id: 'pt4', partName: 'P4', partNumber: 'PN-004', description: 'Connecting Rod Small End' },
-  { id: 'pt5', partName: 'P5', partNumber: 'PN-005', description: 'Valve Guide ID' },
-  { id: 'pt6', partName: 'P6', partNumber: 'PN-006', description: 'Cam Bore Diameter' },
-  { id: 'pt7', partName: 'P7', partNumber: 'PN-007', description: 'Flywheel Face Runout' },
-  { id: 'pt8', partName: 'P8', partNumber: 'PN-008', description: 'Main Journal Diameter' },
-  { id: 'pt9', partName: 'P9', partNumber: 'PN-009', description: 'Thrust Face Width' },
-  { id: 'pt10', partName: 'P10', partNumber: 'PN-010', description: 'Oil Seal Bore' },
+  {
+    id: 'pt1', partName: 'Part A - Lower Extreme', partNumber: 'P-001',
+    description: 'Crankshaft Bearing Housing - near lower spec',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 24.952,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt2', partName: 'Part B - Low', partNumber: 'P-002',
+    description: 'Cylinder Head Bore - below nominal',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 24.965,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt3', partName: 'Part C - Low Mid', partNumber: 'P-003',
+    description: 'Piston Pin Hole - slightly below nominal',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 24.978,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt4', partName: 'Part D - Nominal Low', partNumber: 'P-004',
+    description: 'Connecting Rod Small End - just below nominal',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 24.991,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt5', partName: 'Part E - Nominal', partNumber: 'P-005',
+    description: 'Valve Guide ID - exactly at nominal',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 25.000,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt6', partName: 'Part F - Nominal High', partNumber: 'P-006',
+    description: 'Cam Bore Diameter - just above nominal',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 25.013,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt7', partName: 'Part G - High', partNumber: 'P-007',
+    description: 'Flywheel Face Runout - above nominal',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 25.027,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt8', partName: 'Part H - Upper Extreme', partNumber: 'P-008',
+    description: 'Main Journal Diameter - near upper spec',
+    specification: '25.000 ±0.050 mm',
+    upperSpecLimit: 25.050, lowerSpecLimit: 24.950, tolerance: 0.100,
+    nominalValue: 25.000, trueValue: 25.041,
+    characteristic: 'Shaft Diameter', isActive: true,
+  },
+  {
+    id: 'pt9', partName: 'Part I - Reference', partNumber: 'P-009',
+    description: 'Master Reference Part for Bias studies',
+    specification: '10.000 ±0.010 mm',
+    upperSpecLimit: 10.010, lowerSpecLimit: 9.990, tolerance: 0.020,
+    nominalValue: 10.000, trueValue: 10.000,
+    characteristic: 'Reference Diameter', isActive: true,
+  },
+  {
+    id: 'pt10', partName: 'Part J - Reference', partNumber: 'P-010',
+    description: 'Secondary Master Reference',
+    specification: '50.000 ±0.010 mm',
+    upperSpecLimit: 50.010, lowerSpecLimit: 49.990, tolerance: 0.020,
+    nominalValue: 50.000, trueValue: 50.000,
+    characteristic: 'Reference Diameter', isActive: true,
+  },
 ];
 
+// ─── Seed Locations ─────────────────────────────────────────────────
+// ─── Seed Locations (matches backend department names) ──────────────
+const seedLocations: Location[] = [
+  // Quality Control locations
+  { id: 'loc1',  name: 'Shelf A1',          departmentId: '1', departmentName: 'Quality Control', description: 'Top shelf, QC Lab entrance side', isActive: true },
+  { id: 'loc2',  name: 'Shelf A2',          departmentId: '1', departmentName: 'Quality Control', description: 'Second shelf, QC Lab entrance side', isActive: true },
+  { id: 'loc3',  name: 'Shelf B1',          departmentId: '1', departmentName: 'Quality Control', description: 'Top shelf, QC Lab window side', isActive: true },
+  { id: 'loc4',  name: 'Cabinet C1',        departmentId: '1', departmentName: 'Quality Control', description: 'Locked cabinet for ring gauges', isActive: true },
+  { id: 'loc5',  name: 'Cabinet C2',        departmentId: '1', departmentName: 'Quality Control', description: 'Locked cabinet for plug gauges', isActive: true },
+
+  // Production locations
+  { id: 'loc6',  name: 'Station 1',         departmentId: '2', departmentName: 'Production',      description: 'CNC Machine 1 area', isActive: true },
+  { id: 'loc7',  name: 'Station 2',         departmentId: '2', departmentName: 'Production',      description: 'CNC Machine 2 area', isActive: true },
+  { id: 'loc8',  name: 'Station 3',         departmentId: '2', departmentName: 'Production',      description: 'Assembly line inspection point', isActive: true },
+  { id: 'loc9',  name: 'Inspection Table',  departmentId: '2', departmentName: 'Production',      description: 'Final inspection area', isActive: true },
+
+  // Gauge Room locations
+  { id: 'loc10', name: 'Rack 1',            departmentId: '3', departmentName: 'Gauge Room',      description: 'Main storage rack, temperature controlled', isActive: true },
+  { id: 'loc11', name: 'Rack 2',            departmentId: '3', departmentName: 'Gauge Room',      description: 'Secondary rack near calibration bench', isActive: true },
+  { id: 'loc12', name: 'Calibration Bench', departmentId: '3', departmentName: 'Gauge Room',      description: 'Calibration workbench area', isActive: true },
+
+  // Maintenance locations
+  { id: 'loc13', name: 'Cabinet A1',        departmentId: '4', departmentName: 'Maintenance',     description: 'Torque tools cabinet', isActive: true },
+  { id: 'loc14', name: 'Cabinet B3',        departmentId: '4', departmentName: 'Maintenance',     description: 'Feeler gauge and gap tools', isActive: true },
+  { id: 'loc15', name: 'Workbench 1',       departmentId: '4', departmentName: 'Maintenance',     description: 'Main maintenance workbench', isActive: true },
+
+  // Stores locations
+  { id: 'loc16', name: 'Bin A1',            departmentId: '5', departmentName: 'Stores',          description: 'Incoming gauge storage', isActive: true },
+  { id: 'loc17', name: 'Bin A2',            departmentId: '5', departmentName: 'Stores',          description: 'Outgoing gauge staging', isActive: true },
+  { id: 'loc18', name: 'Returns Shelf',     departmentId: '5', departmentName: 'Stores',          description: 'Returned gauges awaiting inspection', isActive: true },
+];
 // ─── Standards ───────────────────────────────────────────────────────
 const seedStandards: Standard[] = [
   { id: 's1', standardCode: 'STD-001', description: 'Gauge Block Set Grade 1', certifiedValue: '0–100mm ±0.001mm', validUntil: '2025-12-31' },
@@ -1128,55 +1285,7 @@ const seedCalibrations: CalibrationRecord[] = [
 //   },
 // ];
 
-const seedMSA: MSAStudy[] = [
-  {
-    id: 'm1',
-    gaugeId: 'g1',
-    studyType: 'GRR',
-    operatorIds: ['1', '2', '3'], // Backend user IDs as strings
-    operatorNames: ['Operator 1', 'Operator 2', 'Operator 3'],
-    parts: ['P1', 'P2', 'P3', 'P4', 'P5'],
-    numberOfTrials: 3,
-    status: 'Completed',
-    measurements: [
-      {
-        operatorId: '1',
-        operatorName: 'Operator 1',
-        status: 'Completed',
-        data: [
-          [10.02, 10.01, 10.02], [10.01, 10.02, 10.01], [10.02, 10.01, 10.03],
-          [10.03, 10.02, 10.02], [10.02, 10.02, 10.01],
-        ],
-        submittedAt: '2024-07-21T10:30:00',
-      },
-      {
-        operatorId: '2',
-        operatorName: 'Operator 2',
-        status: 'Completed',
-        data: [
-          [10.01, 10.02, 10.01], [10.02, 10.01, 10.02], [10.01, 10.02, 10.02],
-          [10.02, 10.02, 10.01], [10.01, 10.01, 10.02],
-        ],
-        submittedAt: '2024-07-21T14:15:00',
-      },
-      {
-        operatorId: '3',
-        operatorName: 'Operator 3',
-        status: 'Completed',
-        data: [
-          [10.02, 10.01, 10.02], [10.01, 10.02, 10.01], [10.03, 10.02, 10.02],
-          [10.02, 10.01, 10.02], [10.02, 10.02, 10.01],
-        ],
-        submittedAt: '2024-07-22T09:00:00',
-      },
-    ],
-    resultValue: 8.5,
-    passFail: 'Pass',
-    createdBy: 'Admin',
-    createdDate: '2024-07-20',
-    completedDate: '2024-07-22',
-  },
-];
+const seedMSA: MSAStudy[] = [];
 // ─── CAPAs ──────────────────────────────────────────────────────────
 const seedCAPAs: CAPA[] = [
   {
@@ -1254,6 +1363,7 @@ export function seedIfEmpty(): void {
   if (!localStorage.getItem(KEYS.audit)) setAll(KEYS.audit, seedAudit);
   if (!localStorage.getItem(KEYS.operators)) setAll(KEYS.operators, seedOperators);
   if (!localStorage.getItem(KEYS.parts)) setAll(KEYS.parts, seedParts);
+  if (!localStorage.getItem(KEYS.locations)) setAll(KEYS.locations, seedLocations);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1573,6 +1683,33 @@ export const partStorage = {
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// CRUD — LOCATIONS
+// ═══════════════════════════════════════════════════════════════════
+
+export const locationStorage = {
+  getAll: () => getAll<Location>(KEYS.locations),
+  getById: (id: string) => getAll<Location>(KEYS.locations).find((l) => l.id === id),
+  getByDepartment: (departmentName: string) =>
+    getAll<Location>(KEYS.locations).filter(
+      (l) => l.departmentName === departmentName && l.isActive
+    ),
+  add: (item: Omit<Location, 'id'>) => {
+    const all = getAll<Location>(KEYS.locations);
+    const newItem = { ...item, id: generateId() } as Location;
+    setAll(KEYS.locations, [...all, newItem]);
+    return newItem;
+  },
+  update: (id: string, updates: Partial<Location>) => {
+    const all = getAll<Location>(KEYS.locations).map((l) =>
+      l.id === id ? { ...l, ...updates } : l
+    );
+    setAll(KEYS.locations, all);
+  },
+  delete: (id: string) => {
+    setAll(KEYS.locations, getAll<Location>(KEYS.locations).filter((l) => l.id !== id));
+  },
+};
 // ═══════════════════════════════════════════════════════════════════
 // CRUD — AUDIT LOG
 // ═══════════════════════════════════════════════════════════════════
