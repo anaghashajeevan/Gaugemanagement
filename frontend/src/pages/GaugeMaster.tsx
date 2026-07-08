@@ -591,6 +591,8 @@ import {
   departmentStorage,
   locationStorage,
   auditStorage,
+  generateId,
+  getQuarantineReason,
   type Gauge,
 } from '../utils/storage';
 import {
@@ -741,7 +743,20 @@ export default function GaugeMaster() {
         <span className="text-sm">{r.location || '—'}</span>
       </div>
     )},
-    { header: 'Status', cell: (r) => <StatusBadge status={r.status} /> },
+    // { header: 'Status', cell: (r) => <StatusBadge status={r.status} /> },
+    {
+      header: 'Status',
+      cell: (row) => (
+        <div>
+          <StatusBadge status={row.status} />
+          {row.status === 'Under Review' && (
+            <p className="text-[10px] text-red-500 mt-1">
+              {getQuarantineReason(row.id)}
+            </p>
+          )}
+        </div>
+      ),
+    },
     { header: 'Next Due', cell: (r) => {
       const due = getDueStatus(r.nextDueDate);
       return (
@@ -764,7 +779,8 @@ export default function GaugeMaster() {
   ];
 
   return (
-    <Layout pageTitle="Gauge Master">
+    <Layout pageTitle="Gauge Master" pageSubtitle="Manage your gauge inventory, specifications, and status" pageIcon={GaugeIcon}>
+
       {/* Top Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 flex-1 max-w-xl">

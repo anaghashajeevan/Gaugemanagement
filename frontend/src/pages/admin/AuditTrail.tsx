@@ -409,7 +409,6 @@ import {
   ClipboardCheck,
   ArrowLeftRight,
   CheckCircle2,
-  RefreshCw,
 } from 'lucide-react';
 
 const MODULES = [
@@ -615,32 +614,6 @@ export default function AuditTrail() {
           </button>
         </div>
       )}
-
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md"
-            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
-          >
-            <ScrollText className="w-6 h-6" strokeWidth={2} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">System Audit Trail</h2>
-            <p className="text-sm text-gray-500">
-              Read-only log of all backend actions
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={loadData}
-          className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold rounded-xl transition text-sm"
-        >
-          <RefreshCw className="w-4 h-4" strokeWidth={2} />
-          Refresh
-        </button>
-      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">

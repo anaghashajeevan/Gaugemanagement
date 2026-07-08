@@ -391,18 +391,10 @@ export default function Roles() {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md"
-            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
-          >
-            <ShieldCheck className="w-6 h-6" strokeWidth={2} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">System Roles</h2>
-            <p className="text-sm text-gray-500">{roles.length} roles configured</p>
-          </div>
-        </div>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 text-sm font-bold rounded-full">
+          <ShieldCheck className="w-4 h-4" strokeWidth={2} />
+          {roles.length} roles configured
+        </span>
 
         <button
           onClick={openAdd}

@@ -333,7 +333,7 @@
 // }
 
 
-import { type MouseEvent, type ReactNode, useRef, useState } from 'react';
+import { type ComponentType, type MouseEvent, type ReactNode, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../images/logo.png';
@@ -357,13 +357,17 @@ import {
   ChevronDown,Package, 
 } from 'lucide-react';
 
+type PageIconType = ComponentType<{ className?: string; strokeWidth?: number }>;
+
 interface Props {
   children: ReactNode;
   pageTitle?: string;
+  pageSubtitle?: string;
+  pageIcon?: PageIconType;
   headerAction?: ReactNode;
 }
 
-export default function Layout({ children, pageTitle = 'Dashboard', headerAction }: Props) {
+export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle, pageIcon: PageIcon, headerAction }: Props) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -430,7 +434,7 @@ export default function Layout({ children, pageTitle = 'Dashboard', headerAction
       }}
     >
       {/* ─── Top Header ──────────────────────────────────────────────── */}
-      <header className="fixed top-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-6 z-50">
+      <header className="fixed top-0 left-0 right-0 h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-40">
         <div className="flex items-center gap-3 w-64 shrink-0">
           <img
             src={logo}
@@ -584,20 +588,33 @@ export default function Layout({ children, pageTitle = 'Dashboard', headerAction
       <main className="ml-64 pt-20 min-h-screen">
         <div className="p-6">
           {showPageHeading && (
-            <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+            <div
+            className="relative rounded-2xl px-6 py-5 mb-6 shadow-md overflow-hidden flex items-center justify-between gap-4 flex-wrap"
+            style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' }}
+          >
+            <div
+              className="absolute top-0 left-0 right-0 h-1"
+              style={{
+                background:
+                  'linear-gradient(90deg, #4338ca 0%, #7c3aed 25%, #a855f7 45%, #10b981 70%, #eab308 100%)',
+              }}
+            />
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="relative z-10 flex items-center gap-3">
+              {PageIcon && (
+                <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                  <PageIcon className="w-5 h-5 text-white" strokeWidth={2} />
+                </div>
+              )}
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">{pageTitle}</h2>
-                <p className="text-sm text-gray-500">
-                  {new Date().toLocaleDateString('en-IN', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
-                </p>
+                <h2 className="text-xl font-bold text-white">{pageTitle}</h2>
+                {pageSubtitle && (
+                  <p className="text-sm text-indigo-100 mt-1">{pageSubtitle}</p>
+                )}
               </div>
-              {headerAction}
             </div>
+            {headerAction && <div className="relative z-10">{headerAction}</div>}
+          </div>
           )}
           {children}
         </div>

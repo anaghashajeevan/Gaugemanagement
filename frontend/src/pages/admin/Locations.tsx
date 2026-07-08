@@ -240,7 +240,7 @@ export default function Locations() {
   const deleteLoc = locations.find((l) => l.id === deleteId);
 
   return (
-    <Layout pageTitle="Locations">
+    <Layout pageTitle="Locations" pageSubtitle="Manage storage and calibration locations across departments" pageIcon={MapPin}>
       {/* ─── Top Bar ──────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 flex-1 max-w-lg">

@@ -1370,7 +1370,7 @@ export default function CAPAPage() {
   ];
 
   return (
-    <Layout pageTitle="CAPA">
+     <Layout pageTitle="CAPA" pageSubtitle="Track corrective and preventive actions for calibration and MSA failures" pageIcon={AlertTriangle}>
       {quarantinedGauges > 0 && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
           <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">

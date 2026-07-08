@@ -3592,7 +3592,7 @@ export default function MSA() {
   };
 
   return (
-    <Layout pageTitle="MSA Studies">
+    <Layout pageTitle="MSA Studies" pageSubtitle="Conduct and review Measurement System Analysis studies" pageIcon={BarChart3}>
       {/* ─── Operator Welcome Banner ──────────────────────────────── */}
       {isOperator && myTasks.length > 0 && (
         <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex items-start gap-3">
@@ -4969,9 +4969,20 @@ export default function MSA() {
           </>
         }
       >
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">
+        {/* <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">
           <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" strokeWidth={2} />
           This MSA study <strong>FAILED</strong>. The gauge has been <strong>quarantined</strong>.
+        </div> */}
+
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">
+          <AlertTriangle
+            className="w-5 h-5 flex-shrink-0 mt-0.5"
+            strokeWidth={2}
+          />
+          <span>
+            This MSA study <strong>FAILED</strong>. The gauge has been{' '}
+            <strong>quarantined</strong>.
+          </span>
         </div>
         <div className="space-y-4">
           <div>

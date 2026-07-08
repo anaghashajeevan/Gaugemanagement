@@ -458,7 +458,8 @@ export default function GaugeHistory() {
 
   if (!gauge) {
     return (
-      <Layout pageTitle="Gauge Not Found">
+       <Layout pageTitle="Gauge Not Found" pageSubtitle="The requested gauge record could not be located" pageIcon={AlertTriangle}>
+
         <div className="flex flex-col items-center justify-center py-20">
           <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
             <GaugeIcon className="w-10 h-10 text-gray-300" strokeWidth={1.5} />
@@ -650,7 +651,7 @@ export default function GaugeHistory() {
   const dueStatus = gauge.nextDueDate ? getDueStatus(gauge.nextDueDate) : '';
 
   return (
-    <Layout pageTitle="Gauge History Card">
+    <Layout pageTitle="Gauge History Card" pageSubtitle="Complete calibration and usage history for this gauge" pageIcon={Clock}>
       {/* Back Button */}
       <button
         onClick={() => navigate('/gauges')}

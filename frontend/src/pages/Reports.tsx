@@ -1217,7 +1217,7 @@ import {
   type CAPA,
   type IssueReturnLog,
 } from '../utils/storage';
-import { Download, Filter, Calendar, BarChart3 } from 'lucide-react';
+import { Download, Filter, Calendar, BarChart3, FileText } from 'lucide-react';
 
 type ReportType =
   | 'due_overdue'
@@ -1581,7 +1581,7 @@ export default function Reports() {
   };
 
   return (
-    <Layout pageTitle="Reports">
+   <Layout pageTitle="Reports" pageSubtitle="Generate and export reports across gauges, calibration, and quality data" pageIcon={FileText}>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6 overflow-hidden relative">
         <div className="absolute top-0 left-0 right-0 h-1"
           style={{ background: 'linear-gradient(90deg, #4338ca 0%, #7c3aed 25%, #a855f7 45%, #10b981 70%, #eab308 100%)' }} />
