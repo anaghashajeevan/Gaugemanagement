@@ -899,11 +899,16 @@ export default function GaugeMaster() {
     addLine('7. Next Due Date: you do NOT need to fill this in — it is calculated automatically from Last Calibration Date + Calibration Frequency. Only enter a value here if you want to override the automatic calculation.');
     addLine('8. If a Gauge Code you enter already exists in the system, that existing gauge will be UPDATED with your new data instead of creating a duplicate.');
     addLine('9. Save this file and upload it back on the Gauge Master page using "Import Excel".');
+    addLine('10. Image (optional): click the "Image" cell in that gauge\'s row, then Insert → Pictures → This Device, choose the photo, and drag/resize it so it fits neatly inside that row without overlapping into the row above or below. Each picture is matched to a gauge by which row it sits in.');
     addLine('Note: Row 2 in "Gauge Data" is an example — replace it with your own data (or delete the row) before importing.');
 
     // ─── Data sheet — header + one example row ───────────────────────
     const data = wb.addWorksheet('Gauge Data');
-    data.columns = IMPORT_COLUMNS.map((c) => ({ header: c.header, key: c.key, width: 22 }));
+    data.properties.defaultRowHeight = 90;
+    data.columns = [
+      ...IMPORT_COLUMNS.map((c) => ({ header: c.header, key: c.key, width: 22 })),
+      { header: 'Image (insert picture here)', key: 'imageCol', width: 20 },
+    ];
     data.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     data.getRow(1).fill = {
       type: 'pattern',
@@ -945,7 +950,8 @@ export default function GaugeMaster() {
   const validateImportRow = (
     raw: Record<string, string>,
     rowNum: number,
-    seenCodes: Set<string>
+    seenCodes: Set<string>,
+    rowImage?: string
   ): ImportRow => {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -997,7 +1003,7 @@ export default function GaugeMaster() {
         status,
         lastCalibrationDate,
         nextDueDate,
-        image: existing?.image || '',
+        image: rowImage || existing?.image || '',
       },
       errors,
       warnings,
@@ -1005,7 +1011,7 @@ export default function GaugeMaster() {
     };
   };
 
-  const buildImportRows = (table: string[][]): ImportRow[] => {
+  const buildImportRows = (table: string[][], rowImages: Record<number, string> = {}): ImportRow[] => {
     const headerRow = table[0];
     const keyForCol = headerRow.map((h) => {
       const norm = normalizeHeader(h);
@@ -1018,8 +1024,35 @@ export default function GaugeMaster() {
       keyForCol.forEach((key, colIdx) => {
         if (key) raw[key] = cells[colIdx] ?? '';
       });
-      return validateImportRow(raw, idx + 2, seenCodes);
+      const rowNum = idx + 2;
+      return validateImportRow(raw, rowNum, seenCodes, rowImages[rowNum]);
     });
+  };
+
+  // Reads embedded pictures from a worksheet and maps each one to the Excel
+  // row it's anchored to (by top-left corner), as a base64 data URL.
+  const extractRowImages = (
+    wb: ExcelJS.Workbook,
+    ws: ExcelJS.Worksheet
+  ): Record<number, string> => {
+    const map: Record<number, string> = {};
+    const bufferToBase64 = (buf: unknown): string => {
+      const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf as ArrayBuffer);
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    };
+    ws.getImages().forEach((img) => {
+      const media = wb.model.media?.[Number(img.imageId)];
+      if (!media?.buffer) return;
+      const rowNum = Math.round(img.range.tl.nativeRow) + 1;
+      const base64 = bufferToBase64(media.buffer);
+      map[rowNum] = `data:image/${media.extension};base64,${base64}`;
+    });
+    return map;
   };
 
   const handleImportFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -1031,6 +1064,7 @@ export default function GaugeMaster() {
 
     try {
       let table: string[][] = [];
+      let rowImages: Record<number, string> = {};
 
       if (/\.csv$/i.test(file.name)) {
         table = parseCSV(await file.text());
@@ -1039,6 +1073,7 @@ export default function GaugeMaster() {
         await wb.xlsx.load(await file.arrayBuffer());
         const ws = wb.getWorksheet('Gauge Data') || wb.worksheets[wb.worksheets.length - 1];
         table = ws ? worksheetToTable(ws) : [];
+        if (ws) rowImages = extractRowImages(wb, ws);
       }
 
       if (table.length < 2) {
@@ -1046,7 +1081,7 @@ export default function GaugeMaster() {
         setImportStep('preview');
         return;
       }
-      setImportRows(buildImportRows(table));
+      setImportRows(buildImportRows(table, rowImages));
       setImportStep('preview');
     } catch {
       setImportRows([]);
@@ -1629,6 +1664,7 @@ export default function GaugeMaster() {
               <p>Department must already exist under Administration → Departments.</p>
               <p>If Gauge Code matches an existing gauge, that gauge will be <strong>updated</strong> instead of duplicated.</p>
               <p>Leave "Next Due Date" blank to auto-calculate it from Last Calibration Date + Frequency.</p>
+              <p>Optional: insert a picture directly into the "Image" cell for a row to set that gauge's photo (.xlsx only, not .csv).</p>
             </div>
           </div>
         )}
@@ -1664,6 +1700,7 @@ export default function GaugeMaster() {
                   <thead className="sticky top-0">
                     <tr style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
                       <th className="px-3 py-2 text-left text-white font-bold">Row</th>
+                      <th className="px-3 py-2 text-left text-white font-bold">Image</th>
                       <th className="px-3 py-2 text-left text-white font-bold">Gauge Code</th>
                       <th className="px-3 py-2 text-left text-white font-bold">Name</th>
                       <th className="px-3 py-2 text-left text-white font-bold">Department</th>
@@ -1674,6 +1711,13 @@ export default function GaugeMaster() {
                     {importRows.map((r) => (
                       <tr key={r.rowNum} className={r.errors.length > 0 ? 'bg-red-50/40' : 'bg-white'}>
                         <td className="px-3 py-2 text-gray-500">{r.rowNum}</td>
+                        <td className="px-3 py-2">
+                          {r.data.image ? (
+                            <img src={r.data.image} alt="" className="w-8 h-8 object-contain bg-white rounded border border-gray-200" />
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2 font-semibold text-indigo-600">{r.data.gaugeCode || '—'}</td>
                         <td className="px-3 py-2 text-gray-700">{r.data.name || '—'}</td>
                         <td className="px-3 py-2 text-gray-700">{r.data.department || '—'}</td>
