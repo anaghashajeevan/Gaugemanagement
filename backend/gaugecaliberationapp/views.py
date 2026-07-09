@@ -140,11 +140,28 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsAdmin()]
         return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        department = serializer.save()
+        create_audit(self.request.user, 'CREATE', 'departments',
+                     f'Created department {department.name}', department.id, get_client_ip(self.request))
+
+    def perform_update(self, serializer):
+        department = serializer.save()
+        create_audit(self.request.user, 'UPDATE', 'departments',
+                     f'Updated department {department.name}', department.id, get_client_ip(self.request))
+
+    def perform_destroy(self, instance):
+        name = instance.name
+        dept_id = instance.id
+        instance.delete()
+        create_audit(self.request.user, 'DELETE', 'departments',
+                     f'Deleted department {name}', dept_id, get_client_ip(self.request))
 
 
 # ============ USER VIEWSET ============

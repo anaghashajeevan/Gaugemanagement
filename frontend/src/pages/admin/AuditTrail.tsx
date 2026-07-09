@@ -390,10 +390,11 @@
 
 // src/pages/admin/AuditTrail.tsx
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Layout from '../../components/Layout';
 import DataTable, { type Column } from '../../components/DataTable';
-import { auditAPI, type AuditLogType, type AuditAction } from '../../api/api';
+import { auditAPI, type AuditLogType } from '../../api/api';
+import { auditStorage, type AuditLog as LocalAuditLog } from '../../utils/storage';
 import {
   ScrollText,
   Filter,
@@ -409,26 +410,106 @@ import {
   ClipboardCheck,
   ArrowLeftRight,
   CheckCircle2,
+  Download,
 } from 'lucide-react';
 
-const MODULES = [
-  'authentication',
-  'user_management',
-  'roles',
-  'departments',
+// ─── Module normalization ─────────────────────────────────────────
+// Backend AuditLog rows already carry a `module` string (authentication,
+// user_management, roles, departments). Local (localStorage) entries only
+// carry an `entityType` — map those onto the same module vocabulary so
+// both sources can share one filter/badge system.
+const MODULE_LABELS: Record<string, string> = {
+  authentication: 'Authentication',
+  user_management: 'User Management',
+  roles: 'Roles',
+  departments: 'Departments',
+  gauge_master: 'Gauge Master',
+  calibration: 'Calibration',
+  msa: 'MSA Studies',
+  capa: 'CAPA',
+  issue_return: 'Issue / Return',
+  locations: 'Locations',
+  parts: 'Parts Master',
+  outside_labs: 'Outside Labs',
+  reports: 'Reports',
+};
+
+const moduleLabel = (module: string) => MODULE_LABELS[module] || module;
+
+const ENTITY_TYPE_TO_MODULE: Record<string, string> = {
+  Gauge: 'gauge_master',
+  CalibrationRecord: 'calibration',
+  MSAStudy: 'msa',
+  CAPA: 'capa',
+  IssueReturnLog: 'issue_return',
+  Location: 'locations',
+  Part: 'parts',
+  Vendor: 'outside_labs',
+  Report: 'reports',
+};
+
+// Every action actually produced by the backend or the local business
+// pages — not an aspirational list, just what's really written today.
+const KNOWN_ACTIONS = [
+  'LOGIN', 'LOGOUT', 'LOGIN_FAILED',
+  'CREATE', 'UPDATE', 'DELETE',
+  'CALIBRATE', 'ISSUE', 'RETURN', 'CLOSE_CAPA', 'EXPORT',
 ];
 
-const ACTIONS: AuditAction[] = [
-  'LOGIN',
-  'LOGOUT',
-  'LOGIN_FAILED',
-  'CREATE',
-  'UPDATE',
-  'DELETE',
-];
+// ─── Unified entry shape merging backend AuditLog + local gm_audit ───
+interface UnifiedAuditEntry {
+  id: string;
+  timestamp: string;
+  userName: string;
+  action: string;
+  module: string;
+  description: string;
+  recordId?: string;
+  entityReference?: string;
+  ipAddress?: string;
+  source: 'backend' | 'local';
+}
+
+function normalizeBackend(log: AuditLogType): UnifiedAuditEntry {
+  return {
+    id: `backend-${log.id}`,
+    timestamp: log.timestamp,
+    userName: log.user_name || 'System',
+    action: log.action,
+    module: log.module,
+    description: log.description || '',
+    recordId: log.record_id || undefined,
+    ipAddress: log.ip_address || undefined,
+    source: 'backend',
+  };
+}
+
+// Legacy gm_audit entries may predate userName/description/entityReference,
+// or carry the old placeholder userId 'current'. Never attribute those to
+// whoever happens to be logged in right now — label them as a legacy/
+// unknown actor instead. Corrupt entries (bad timestamp) are dropped
+// rather than allowed to crash the page.
+function normalizeLocal(log: LocalAuditLog): UnifiedAuditEntry | null {
+  if (!log || !log.timestamp || isNaN(new Date(log.timestamp).getTime())) return null;
+  const module = ENTITY_TYPE_TO_MODULE[log.entityType] || 'other';
+  const knownActorId = log.userId && log.userId !== 'current' && log.userId !== 'unknown';
+  return {
+    id: `local-${log.id}`,
+    timestamp: log.timestamp,
+    userName: log.userName || (knownActorId ? `User ${log.userId}` : 'Legacy User'),
+    action: log.action,
+    module,
+    description: log.description || `${log.action} ${log.entityType} ${log.entityId}`,
+    recordId: log.entityId,
+    entityReference: log.entityReference,
+    ipAddress: undefined,
+    source: 'local',
+  };
+}
 
 export default function AuditTrail() {
-  const [logs, setLogs] = useState<AuditLogType[]>([]);
+  const [backendLogs, setBackendLogs] = useState<AuditLogType[]>([]);
+  const [localLogs, setLocalLogs] = useState<LocalAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -438,37 +519,68 @@ export default function AuditTrail() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // ─── Load ─────────────────────────────────────────────────────────
-  const loadData = async () => {
+  // ─── Load both sources ────────────────────────────────────────────
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const data = await auditAPI.list();
-      setLogs(Array.isArray(data) ? data : []);
+      setBackendLogs(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError(err.message || 'Failed to load audit logs.');
     } finally {
       setLoading(false);
     }
-  };
+    try {
+      setLocalLogs(auditStorage.getAll());
+    } catch {
+      setLocalLogs([]);
+    }
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+    // Refresh on tab focus, and on cross-tab localStorage writes — the
+    // native 'storage' event never fires in the same tab that called
+    // setItem, so same-tab freshness relies on the mount-time load above
+    // (this page remounts on every route navigation back to it).
+    const onFocus = () => loadData();
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === 'gm_audit') loadData();
+    };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [loadData]);
+
+  // ─── Merge + normalize ────────────────────────────────────────────
+  const merged = useMemo<UnifiedAuditEntry[]>(() => {
+    const backend = backendLogs.map(normalizeBackend);
+    const local = localLogs
+      .map(normalizeLocal)
+      .filter((e): e is UnifiedAuditEntry => e !== null);
+    return [...backend, ...local].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [backendLogs, localLogs]);
 
   // ─── Filtered ─────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let list = logs;
+    let list = merged;
 
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
         (l) =>
-          (l.user_name || '').toLowerCase().includes(q) ||
+          l.userName.toLowerCase().includes(q) ||
           l.action.toLowerCase().includes(q) ||
           l.module.toLowerCase().includes(q) ||
-          (l.description || '').toLowerCase().includes(q) ||
-          (l.record_id || '').toLowerCase().includes(q)
+          l.description.toLowerCase().includes(q) ||
+          (l.recordId || '').toLowerCase().includes(q) ||
+          (l.entityReference || '').toLowerCase().includes(q)
       );
     }
 
@@ -491,22 +603,27 @@ export default function AuditTrail() {
     }
 
     return list;
-  }, [logs, search, filterModule, filterAction, dateFrom, dateTo]);
+  }, [merged, search, filterModule, filterAction, dateFrom, dateTo]);
 
   // ─── Action styling ───────────────────────────────────────────────
-  const getActionColor = (action: AuditAction) => {
+  const getActionColor = (action: string) => {
     switch (action) {
       case 'LOGIN': return 'bg-indigo-50 text-indigo-700';
       case 'LOGOUT': return 'bg-gray-100 text-gray-600';
       case 'LOGIN_FAILED': return 'bg-red-50 text-red-700';
-      case 'CREATE': return 'bg-emerald-50 text-emerald-700';
-      case 'UPDATE': return 'bg-blue-50 text-blue-700';
+      case 'CREATE': return 'bg-blue-50 text-blue-700';
+      case 'UPDATE': return 'bg-amber-50 text-amber-700';
       case 'DELETE': return 'bg-red-50 text-red-700';
+      case 'CALIBRATE': return 'bg-emerald-50 text-emerald-700';
+      case 'ISSUE': return 'bg-violet-50 text-violet-700';
+      case 'RETURN': return 'bg-cyan-50 text-cyan-700';
+      case 'CLOSE_CAPA': return 'bg-emerald-50 text-emerald-700';
+      case 'EXPORT': return 'bg-indigo-50 text-indigo-700';
       default: return 'bg-gray-100 text-gray-600';
     }
   };
 
-  const getActionIcon = (action: AuditAction) => {
+  const getActionIcon = (action: string) => {
     switch (action) {
       case 'LOGIN': return <LogIn className="w-3.5 h-3.5" strokeWidth={2.5} />;
       case 'LOGOUT': return <LogOut className="w-3.5 h-3.5" strokeWidth={2.5} />;
@@ -514,6 +631,11 @@ export default function AuditTrail() {
       case 'CREATE': return <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />;
       case 'UPDATE': return <Edit3 className="w-3.5 h-3.5" strokeWidth={2.5} />;
       case 'DELETE': return <Trash2 className="w-3.5 h-3.5" strokeWidth={2.5} />;
+      case 'CALIBRATE': return <ClipboardCheck className="w-3.5 h-3.5" strokeWidth={2.5} />;
+      case 'ISSUE':
+      case 'RETURN': return <ArrowLeftRight className="w-3.5 h-3.5" strokeWidth={2.5} />;
+      case 'CLOSE_CAPA': return <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2.5} />;
+      case 'EXPORT': return <Download className="w-3.5 h-3.5" strokeWidth={2.5} />;
       default: return <Shield className="w-3.5 h-3.5" strokeWidth={2.5} />;
     }
   };
@@ -528,24 +650,29 @@ export default function AuditTrail() {
     }
   };
 
-  // ─── Stats ────────────────────────────────────────────────────────
+  // ─── Stats (computed from the merged backend + local dataset) ────
   const stats = useMemo(() => ({
-    total: logs.length,
-    logins: logs.filter((l) => l.action === 'LOGIN').length,
-    failed: logs.filter((l) => l.action === 'LOGIN_FAILED').length,
-    creates: logs.filter((l) => l.action === 'CREATE').length,
-    updates: logs.filter((l) => l.action === 'UPDATE').length,
-    deletes: logs.filter((l) => l.action === 'DELETE').length,
-  }), [logs]);
+    total: merged.length,
+    logins: merged.filter((l) => l.action === 'LOGIN').length,
+    failed: merged.filter((l) => l.action === 'LOGIN_FAILED').length,
+    creates: merged.filter((l) => l.action === 'CREATE').length,
+    updates: merged.filter((l) => l.action === 'UPDATE').length,
+    deletes: merged.filter((l) => l.action === 'DELETE').length,
+  }), [merged]);
 
-  // ─── Unique modules from actual data ─────────────────────────────
+  // ─── Unique modules/actions from actual merged data ──────────────
   const availableModules = useMemo(
-    () => [...new Set(logs.map((l) => l.module))].sort(),
-    [logs]
+    () => [...new Set(merged.map((l) => l.module))].sort(),
+    [merged]
+  );
+
+  const availableActions = useMemo(
+    () => KNOWN_ACTIONS.filter((a) => merged.some((l) => l.action === a)),
+    [merged]
   );
 
   // ─── Columns ──────────────────────────────────────────────────────
-  const columns: Column<AuditLogType>[] = [
+  const columns: Column<UnifiedAuditEntry>[] = [
     {
       header: 'Timestamp',
       cell: (row) => (
@@ -560,9 +687,17 @@ export default function AuditTrail() {
     {
       header: 'User',
       cell: (row) => (
-        <span className="text-sm font-medium text-gray-700">
-          {row.user_name || 'System'}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-gray-700">{row.userName}</span>
+          <span
+            className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${
+              row.source === 'backend' ? 'bg-slate-100 text-slate-500' : 'bg-sky-50 text-sky-500'
+            }`}
+            title={row.source === 'backend' ? 'Recorded by the server' : 'Recorded locally in this browser'}
+          >
+            {row.source === 'backend' ? 'Server' : 'Local'}
+          </span>
+        </div>
       ),
     },
     {
@@ -580,26 +715,42 @@ export default function AuditTrail() {
       header: 'Module',
       cell: (row) => (
         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getModuleColor(row.module)}`}>
-          {row.module}
+          {moduleLabel(row.module)}
         </span>
       ),
     },
     {
       header: 'Description',
       cell: (row) => (
-        <span className="text-sm text-gray-600 truncate max-w-[300px] block">
+        <span className="text-sm text-gray-600 block whitespace-normal break-words min-w-[220px]">
           {row.description || '—'}
         </span>
       ),
     },
-    {
-      header: 'IP Address',
-      cell: (row) => (
-        <span className="text-xs text-gray-400 font-mono">
-          {row.ip_address || '—'}
-        </span>
-      ),
-    },
+    // Entity / Reference column — disabled for now. The Description column
+    // already spells out the affected record (gauge code, department name,
+    // etc.) in readable form; this column mostly just duplicated that or, for
+    // records with no human-readable code (Departments/Roles/Users/Auth),
+    // showed a bare database primary key. Keeping the renderer around in
+    // case a real business reference column is wanted later.
+    // {
+    //   header: 'Entity / Reference',
+    //   cell: (row) => (
+    //     <span className="font-mono text-xs text-gray-500 bg-gray-50 px-2 py-0.5 rounded">
+    //       {row.entityReference || row.recordId || '—'}
+    //     </span>
+    //   ),
+    // },
+    // IP Address column — disabled for now, keeping the cell renderer around
+    // in case it's needed again.
+    // {
+    //   header: 'IP Address',
+    //   cell: (row) => (
+    //     <span className="text-xs text-gray-400 font-mono">
+    //       {row.source === 'local' ? 'Local' : (row.ipAddress || '—')}
+    //     </span>
+    //   ),
+    // },
   ];
 
   return (
@@ -643,7 +794,7 @@ export default function AuditTrail() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" strokeWidth={2} />
               <input
                 type="text"
-                placeholder="Search user, action, description…"
+                placeholder="Search user, action, description, gauge…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition"
@@ -663,7 +814,7 @@ export default function AuditTrail() {
               >
                 <option value="">All Modules</option>
                 {availableModules.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>{moduleLabel(m)}</option>
                 ))}
               </select>
             </div>
@@ -678,7 +829,7 @@ export default function AuditTrail() {
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition appearance-none cursor-pointer"
             >
               <option value="">All Actions</option>
-              {ACTIONS.map((a) => (
+              {availableActions.map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
@@ -722,7 +873,7 @@ export default function AuditTrail() {
         />
         <h3 className="text-lg font-bold text-gray-800">Log Entries</h3>
         <span className="ml-2 px-2.5 py-0.5 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full">
-          {filtered.length} of {logs.length}
+          {filtered.length} of {merged.length}
         </span>
       </div>
 
@@ -730,7 +881,7 @@ export default function AuditTrail() {
       <DataTable
         columns={columns}
         data={filtered}
-        keyExtractor={(r) => String(r.id)}
+        keyExtractor={(r) => r.id}
         loading={loading}
         emptyTitle="No audit log entries"
         emptySubtitle="Actions will be recorded as users interact with the system."

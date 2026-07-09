@@ -1211,12 +1211,15 @@ import {
   msaStorage,
   capaStorage,
   issueReturnStorage,
+  auditStorage,
+  auditActor,
   type Gauge,
   type CalibrationRecord,
   type MSAStudy,
   type CAPA,
   type IssueReturnLog,
 } from '../utils/storage';
+import { useAuth } from '../context/AuthContext';
 import { Download, Filter, Calendar, BarChart3, FileText } from 'lucide-react';
 
 type ReportType =
@@ -1241,6 +1244,7 @@ const REPORT_OPTIONS: { value: ReportType; label: string }[] = [
 ];
 
 export default function Reports() {
+  const { user } = useAuth();
   const [reportType, setReportType] = useState<ReportType>('gauge_status');
   const [filterDept, setFilterDept] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -1448,6 +1452,15 @@ export default function Reports() {
     link.download = `${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+
+    auditStorage.add({
+      action: 'EXPORT',
+      entityType: 'Report',
+      entityId: reportType,
+      description: `Exported ${REPORT_OPTIONS.find((o) => o.value === reportType)?.label || reportType} report`,
+      ...auditActor(user),
+      timestamp: new Date().toISOString(),
+    });
   };
 
   // ─── Columns ──────────────────────────────────────────────────────

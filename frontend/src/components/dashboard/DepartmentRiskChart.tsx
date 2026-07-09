@@ -28,7 +28,7 @@ export default function DepartmentRiskChart({ rows }: Props) {
     );
   }
 
-  const height = Math.max(200, rows.length * 46);
+  const height = Math.max(200, rows.length * 56);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -36,7 +36,7 @@ export default function DepartmentRiskChart({ rows }: Props) {
         data={rows}
         layout="vertical"
         margin={{ top: 4, right: 16, left: 8, bottom: 0 }}
-        barCategoryGap={16}
+        barCategoryGap={12}
       >
         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
         <XAxis
@@ -60,7 +60,7 @@ export default function DepartmentRiskChart({ rows }: Props) {
         />
         <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} iconType="circle" iconSize={8} />
         {SERIES.map((s) => (
-          <Bar key={s.key} dataKey={s.key} name={s.name} stackId="risk" fill={s.color} maxBarSize={22} />
+          <Bar key={s.key} dataKey={s.key} name={s.name} stackId="risk" fill={s.color} maxBarSize={36} />
         ))}
       </BarChart>
     </ResponsiveContainer>

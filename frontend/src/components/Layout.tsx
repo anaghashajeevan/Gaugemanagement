@@ -436,7 +436,7 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
     >
       {/* ─── Top Header ──────────────────────────────────────────────── */}
       <header
-        className="fixed top-0 left-0 right-0 h-20 bg-white/95 border-b flex items-center justify-between px-6 z-40"
+        className="fixed top-0 left-0 right-0 h-20 bg-white border-b flex items-center justify-between px-6 z-40"
         style={{
           borderColor: '#E7ECF3',
           boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(79, 70, 229, 0.05)',
@@ -456,8 +456,22 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
           </div>
         </div>
 
-        <div className="absolute left-1/2 -translate-x-1/2 text-center">
+        {/* <div className="absolute left-1/2 -translate-x-1/2 text-center">
           <h1 className="text-lg font-bold text-[#172033] leading-tight tracking-[-0.01em]">
+            Gauge Calibration Management System
+          </h1>
+        </div> */}
+
+          <div className="absolute left-1/2 -translate-x-1/2 text-center">
+          <h1
+            className="text-xl font-extrabold leading-tight tracking-[-0.02em] bg-clip-text text-transparent"
+            style={{
+              fontFamily: "'Poppins', 'Inter', 'Segoe UI', system-ui, sans-serif",
+              backgroundImage: 'linear-gradient(90deg, #4338CA 0%, #4F46E5 25%, #7C3AED 50%, #2563EB 75%, #4338CA 100%)',
+              backgroundSize: '200% auto',
+              animation: 'headerGradientShift 6s ease-in-out infinite',
+            }}
+          >
             Gauge Calibration Management System
           </h1>
         </div>
@@ -653,6 +667,14 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
           {children}
         </div>
       </main>
+
+       <style>{`
+        @keyframes headerGradientShift {
+          0%   { background-position: 0% center; }
+          50%  { background-position: 100% center; }
+          100% { background-position: 0% center; }
+        }
+      `}</style>
     </div>
   );
 }

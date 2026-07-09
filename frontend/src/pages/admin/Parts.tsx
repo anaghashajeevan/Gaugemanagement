@@ -7,8 +7,10 @@ import Modal from '../../components/Modal';
 import {
   partStorage,
   auditStorage,
+  auditActor,
   type Part,
 } from '../../utils/storage';
+import { useAuth } from '../../context/AuthContext';
 import {
   Package,
   Plus,
@@ -34,6 +36,7 @@ const emptyForm: Omit<Part, 'id'> = {
 };
 
 export default function Parts() {
+  const { user } = useAuth();
   const [parts, setParts] = useState<Part[]>(partStorage.getAll());
   const [search, setSearch] = useState('');
 
@@ -100,13 +103,17 @@ export default function Parts() {
       partStorage.update(editingId, finalForm);
       auditStorage.add({
         action: 'UPDATE', entityType: 'Part', entityId: editingId,
-        userId: 'current', timestamp: new Date().toISOString(),
+        entityReference: finalForm.partNumber,
+        description: `Updated part ${finalForm.partNumber} — ${finalForm.partName}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
       });
     } else {
       const created = partStorage.add(finalForm);
       auditStorage.add({
         action: 'CREATE', entityType: 'Part', entityId: created.id,
-        userId: 'current', timestamp: new Date().toISOString(),
+        entityReference: created.partNumber,
+        description: `Created part ${created.partNumber} — ${created.partName}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
       });
     }
     reload();
@@ -115,10 +122,13 @@ export default function Parts() {
 
   const handleDelete = () => {
     if (!deleteId) return;
+    const partToDelete = parts.find((p) => p.id === deleteId);
     partStorage.delete(deleteId);
     auditStorage.add({
       action: 'DELETE', entityType: 'Part', entityId: deleteId,
-      userId: 'current', timestamp: new Date().toISOString(),
+      entityReference: partToDelete?.partNumber,
+      description: `Deleted part ${partToDelete?.partNumber || deleteId}`,
+      ...auditActor(user), timestamp: new Date().toISOString(),
     });
     reload();
     setDeleteId(null);

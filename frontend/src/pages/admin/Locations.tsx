@@ -8,9 +8,11 @@ import Modal from '../../components/Modal';
 import {
   locationStorage,
   auditStorage,
+  auditActor,
   type Location,
 } from '../../utils/storage';
 import { departmentsAPI, type DepartmentType } from '../../api/api';
+import { useAuth } from '../../context/AuthContext';
 import {
   MapPin,
   Plus,
@@ -31,6 +33,7 @@ const emptyForm = {
 };
 
 export default function Locations() {
+  const { user } = useAuth();
   const [locations, setLocations] = useState<Location[]>(locationStorage.getAll());
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState('');
@@ -128,13 +131,15 @@ export default function Locations() {
       locationStorage.update(editingId, form);
       auditStorage.add({
         action: 'UPDATE', entityType: 'Location', entityId: editingId,
-        userId: 'current', timestamp: new Date().toISOString(),
+        entityReference: form.name, description: `Updated location ${form.name}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
       });
     } else {
       const created = locationStorage.add(form);
       auditStorage.add({
         action: 'CREATE', entityType: 'Location', entityId: created.id,
-        userId: 'current', timestamp: new Date().toISOString(),
+        entityReference: created.name, description: `Created location ${created.name}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
       });
     }
 
@@ -144,10 +149,13 @@ export default function Locations() {
 
   const handleDelete = () => {
     if (!deleteId) return;
+    const locationToDelete = locations.find((l) => l.id === deleteId);
     locationStorage.delete(deleteId);
     auditStorage.add({
       action: 'DELETE', entityType: 'Location', entityId: deleteId,
-      userId: 'current', timestamp: new Date().toISOString(),
+      entityReference: locationToDelete?.name,
+      description: `Deleted location ${locationToDelete?.name || deleteId}`,
+      ...auditActor(user), timestamp: new Date().toISOString(),
     });
     reload();
     setDeleteId(null);

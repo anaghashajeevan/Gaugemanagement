@@ -1102,8 +1102,10 @@ import {
   msaStorage,
   calibrationStorage,
   auditStorage,
+  auditActor,
   type CAPA as CAPAType,
 } from '../utils/storage';
+import { useAuth } from '../context/AuthContext';
 import {
   AlertTriangle,
   Plus,
@@ -1139,6 +1141,7 @@ const emptyForm = {
 
 export default function CAPAPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [capas, setCapas] = useState<CAPAType[]>(capaStorage.getAll());
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -1228,18 +1231,23 @@ export default function CAPAPage() {
       return;
     }
 
+    const capaGauge = gauges.find((g) => g.id === form.gaugeId);
     if (editingId) {
       capaStorage.update(editingId, form);
       auditStorage.add({
         action: 'UPDATE', entityType: 'CAPA', entityId: editingId,
-        userId: 'current', timestamp: new Date().toISOString(),
+        entityReference: capaGauge?.gaugeCode,
+        description: `Updated CAPA for gauge ${capaGauge?.gaugeCode || form.gaugeId}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
       });
     } else {
       gaugeStorage.update(form.gaugeId, { status: 'Under Review' });
       const created = capaStorage.add(form);
       auditStorage.add({
         action: 'CREATE', entityType: 'CAPA', entityId: created.id,
-        userId: 'current', timestamp: new Date().toISOString(),
+        entityReference: capaGauge?.gaugeCode,
+        description: `Created CAPA for gauge ${capaGauge?.gaugeCode || form.gaugeId}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
       });
     }
     reload();
@@ -1280,9 +1288,12 @@ export default function CAPAPage() {
 
     gaugeStorage.update(capa.gaugeId, { status: newGaugeStatus as any });
 
+    const closedCapaGauge = gauges.find((g) => g.id === capa.gaugeId);
     auditStorage.add({
       action: 'CLOSE_CAPA', entityType: 'CAPA', entityId: closeCapaId,
-      userId: 'current', timestamp: new Date().toISOString(),
+      entityReference: closedCapaGauge?.gaugeCode,
+      description: `Closed CAPA for gauge ${closedCapaGauge?.gaugeCode || capa.gaugeId} (${newGaugeStatus})`,
+      ...auditActor(user), timestamp: new Date().toISOString(),
     });
 
     reload();

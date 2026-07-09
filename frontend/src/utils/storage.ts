@@ -793,6 +793,11 @@ export interface AuditLog {
   entityId: string;
   userId: string;
   timestamp: string;
+  // Optional — added for unified Audit Trail support. Absent on legacy
+  // entries written before these fields existed; consumers must fall back.
+  userName?: string;
+  description?: string;
+  entityReference?: string;
 }
 
 export interface Operator {
@@ -1716,6 +1721,22 @@ export const locationStorage = {
 // ═══════════════════════════════════════════════════════════════════
 // CRUD — AUDIT LOG
 // ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Resolves the real logged-in user (from AuthContext) into the
+ * userId/userName pair local audit entries should be tagged with.
+ * Falls back to 'unknown'/'Unknown User' when no user is available —
+ * never silently attributes an action to a placeholder identity.
+ */
+export function auditActor(
+  user: { id: number | string; full_name?: string | null; email?: string | null } | null | undefined
+): { userId: string; userName: string } {
+  if (!user) return { userId: 'unknown', userName: 'Unknown User' };
+  return {
+    userId: String(user.id),
+    userName: user.full_name || user.email || 'Unknown User',
+  };
+}
 
 export const auditStorage = {
   getAll: () =>

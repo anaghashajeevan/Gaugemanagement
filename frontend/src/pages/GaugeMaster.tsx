@@ -591,10 +591,12 @@ import {
   gaugeStorage,
   locationStorage,
   auditStorage,
+  auditActor,
   generateId,
   getQuarantineReason,
   type Gauge,
 } from '../utils/storage';
+import { useAuth } from '../context/AuthContext';
 import { departmentsAPI, type DepartmentType } from '../api/api';
 import {
   Gauge as GaugeIcon,
@@ -728,6 +730,7 @@ const emptyForm: Omit<Gauge, 'id'> = {
 
 export default function GaugeMaster() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [gauges, setGauges] = useState<Gauge[]>(gaugeStorage.getAll());
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState('');
@@ -810,18 +813,32 @@ export default function GaugeMaster() {
     }
     if (editingId) {
       gaugeStorage.update(editingId, form);
-      auditStorage.add({ action: 'UPDATE', entityType: 'Gauge', entityId: editingId, userId: 'current', timestamp: new Date().toISOString() });
+      auditStorage.add({
+        action: 'UPDATE', entityType: 'Gauge', entityId: editingId,
+        entityReference: form.gaugeCode, description: `Updated gauge ${form.gaugeCode}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
+      });
     } else {
       const created = gaugeStorage.add(form);
-      auditStorage.add({ action: 'CREATE', entityType: 'Gauge', entityId: created.id, userId: 'current', timestamp: new Date().toISOString() });
+      auditStorage.add({
+        action: 'CREATE', entityType: 'Gauge', entityId: created.id,
+        entityReference: created.gaugeCode, description: `Created gauge ${created.gaugeCode}`,
+        ...auditActor(user), timestamp: new Date().toISOString(),
+      });
     }
     reload(); setModalOpen(false);
   };
 
   const handleDelete = () => {
     if (!deleteId) return;
+    const gaugeToDelete = gauges.find((g) => g.id === deleteId);
     gaugeStorage.delete(deleteId);
-    auditStorage.add({ action: 'DELETE', entityType: 'Gauge', entityId: deleteId, userId: 'current', timestamp: new Date().toISOString() });
+    auditStorage.add({
+      action: 'DELETE', entityType: 'Gauge', entityId: deleteId,
+      entityReference: gaugeToDelete?.gaugeCode,
+      description: `Deleted gauge ${gaugeToDelete?.gaugeCode || deleteId}`,
+      ...auditActor(user), timestamp: new Date().toISOString(),
+    });
     reload(); setDeleteId(null);
   };
 
@@ -837,7 +854,11 @@ export default function GaugeMaster() {
     });
     setForm((prev) => ({ ...prev, location: newLoc.name }));
     setNewLocName(''); setNewLocDesc(''); setAddLocOpen(false);
-    auditStorage.add({ action: 'CREATE', entityType: 'Location', entityId: newLoc.id, userId: 'current', timestamp: new Date().toISOString() });
+    auditStorage.add({
+      action: 'CREATE', entityType: 'Location', entityId: newLoc.id,
+      entityReference: newLoc.name, description: `Created location ${newLoc.name}`,
+      ...auditActor(user), timestamp: new Date().toISOString(),
+    });
   };
 
   const updateField = <K extends keyof Omit<Gauge, 'id'>>(key: K, value: Omit<Gauge, 'id'>[K]) => {
@@ -1107,7 +1128,8 @@ export default function GaugeMaster() {
       action: 'CREATE',
       entityType: 'Gauge',
       entityId: 'bulk-import',
-      userId: 'current',
+      description: `Bulk imported gauges (${created} created, ${updated} updated)`,
+      ...auditActor(user),
       timestamp: new Date().toISOString(),
     });
     reload();

@@ -2807,6 +2807,7 @@ import {
   partStorage,
   capaStorage,
   auditStorage,
+  auditActor,
   type MSAStudy,
   type MSAOperatorMeasurement,
   type Part,
@@ -3185,13 +3186,18 @@ export default function MSA() {
       gaugeStorage.update(createGaugeId, { status: 'Under MSA Study' });
     }
 
-    auditStorage.add({
-      action: 'CREATE',
-      entityType: 'MSAStudy',
-      entityId: newStudy.id,
-      userId: currentUserId,
-      timestamp: new Date().toISOString(),
-    });
+    {
+      const studyGauge = gauges.find((g) => g.id === createGaugeId);
+      auditStorage.add({
+        action: 'CREATE',
+        entityType: 'MSAStudy',
+        entityId: newStudy.id,
+        entityReference: studyGauge?.gaugeCode,
+        description: `Created ${createType} MSA study for gauge ${studyGauge?.gaugeCode || createGaugeId}`,
+        ...auditActor(user),
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     reload();
     setCreateOpen(false);
@@ -3273,13 +3279,18 @@ export default function MSA() {
       status: newStatus as MSAStudy['status'],
     });
 
-    auditStorage.add({
-      action: 'UPDATE',
-      entityType: 'MSAStudy',
-      entityId: selectedStudyId,
-      userId: measureOperatorId,
-      timestamp: new Date().toISOString(),
-    });
+    {
+      const studyGauge = gauges.find((g) => g.id === study.gaugeId);
+      auditStorage.add({
+        action: 'UPDATE',
+        entityType: 'MSAStudy',
+        entityId: selectedStudyId,
+        entityReference: studyGauge?.gaugeCode,
+        description: `Submitted MSA measurements for gauge ${studyGauge?.gaugeCode || study.gaugeId}`,
+        ...auditActor(user),
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     reload();
     setMeasureModalOpen(false);
@@ -3381,7 +3392,9 @@ export default function MSA() {
       action: 'UPDATE',
       entityType: 'MSAStudy',
       entityId: studyId,
-      userId: currentUserId,
+      entityReference: gauge?.gaugeCode,
+      description: `Completed ${study.studyType} MSA study for gauge ${gauge?.gaugeCode || study.gaugeId} — ${updates.passFail === 'Fail' ? 'FAIL' : 'PASS'}`,
+      ...auditActor(user),
       timestamp: new Date().toISOString(),
     });
 
@@ -3406,7 +3419,7 @@ export default function MSA() {
     )
       return;
 
-    capaStorage.add({
+    const createdCapa = capaStorage.add({
       sourceType: 'MSA',
       sourceId: capaPrompt.id,
       gaugeId: capaPrompt.gaugeId,
@@ -3418,6 +3431,19 @@ export default function MSA() {
     });
 
     gaugeStorage.update(capaPrompt.gaugeId, { status: 'Under Review' });
+
+    {
+      const capaGauge = gauges.find((g) => g.id === capaPrompt.gaugeId);
+      auditStorage.add({
+        action: 'CREATE',
+        entityType: 'CAPA',
+        entityId: createdCapa.id,
+        entityReference: capaGauge?.gaugeCode,
+        description: `Created CAPA for gauge ${capaGauge?.gaugeCode || capaPrompt.gaugeId} due to MSA study failure`,
+        ...auditActor(user),
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     setCapaPrompt(null);
     setCapaForm({

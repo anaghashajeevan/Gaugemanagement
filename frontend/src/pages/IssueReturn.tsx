@@ -512,8 +512,10 @@ import {
   gaugeStorage,
   appUserStorage,
   auditStorage,
+  auditActor,
   type IssueReturnLog,
 } from '../utils/storage';
+import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeftRight,
   Send,
@@ -527,6 +529,7 @@ import {
 } from 'lucide-react';
 
 export default function IssueReturn() {
+  const { user } = useAuth();
   const [logs, setLogs] = useState<IssueReturnLog[]>(issueReturnStorage.getAll());
   const [search, setSearch] = useState('');
 
@@ -593,7 +596,9 @@ export default function IssueReturn() {
 
     auditStorage.add({
       action: 'ISSUE', entityType: 'IssueReturnLog', entityId: newLog.id,
-      userId: 'current', timestamp: new Date().toISOString(),
+      entityReference: gauge?.gaugeCode,
+      description: `Issued gauge ${gauge?.gaugeCode || issueGaugeId} to ${issueTo}`,
+      ...auditActor(user), timestamp: new Date().toISOString(),
     });
 
     reload();
@@ -611,9 +616,12 @@ export default function IssueReturn() {
 
     gaugeStorage.update(gaugeId, { status: 'Available' });
 
+    const returnedGauge = gauges.find((g) => g.id === gaugeId);
     auditStorage.add({
       action: 'RETURN', entityType: 'IssueReturnLog', entityId: logId,
-      userId: 'current', timestamp: new Date().toISOString(),
+      entityReference: returnedGauge?.gaugeCode,
+      description: `Returned gauge ${returnedGauge?.gaugeCode || gaugeId}`,
+      ...auditActor(user), timestamp: new Date().toISOString(),
     });
 
     reload();

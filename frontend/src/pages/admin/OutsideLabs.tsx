@@ -7,9 +7,11 @@ import Modal from '../../components/Modal';
 import {
   vendorStorage,
   auditStorage,
+  auditActor,
   type Vendor,
 } from '../../utils/storage';
 import { GAUGE_TYPES } from '../../utils/constants';
+import { useAuth } from '../../context/AuthContext';
 import {
   FlaskConical,
   Plus,
@@ -29,6 +31,7 @@ const emptyForm: Omit<Vendor, 'id'> = {
 };
 
 export default function OutsideLabs() {
+  const { user } = useAuth();
   const [vendors, setVendors] = useState<Vendor[]>(vendorStorage.getAll());
   const [search, setSearch] = useState('');
 
@@ -79,7 +82,9 @@ export default function OutsideLabs() {
         action: 'UPDATE',
         entityType: 'Vendor',
         entityId: editingId,
-        userId: 'current',
+        entityReference: form.name,
+        description: `Updated outside lab ${form.name}`,
+        ...auditActor(user),
         timestamp: new Date().toISOString(),
       });
     } else {
@@ -88,7 +93,9 @@ export default function OutsideLabs() {
         action: 'CREATE',
         entityType: 'Vendor',
         entityId: created.id,
-        userId: 'current',
+        entityReference: created.name,
+        description: `Created outside lab ${created.name}`,
+        ...auditActor(user),
         timestamp: new Date().toISOString(),
       });
     }
@@ -98,12 +105,15 @@ export default function OutsideLabs() {
 
   const handleDelete = () => {
     if (!deleteId) return;
+    const vendorToDelete = vendors.find((v) => v.id === deleteId);
     vendorStorage.delete(deleteId);
     auditStorage.add({
       action: 'DELETE',
       entityType: 'Vendor',
       entityId: deleteId,
-      userId: 'current',
+      entityReference: vendorToDelete?.name,
+      description: `Deleted outside lab ${vendorToDelete?.name || deleteId}`,
+      ...auditActor(user),
       timestamp: new Date().toISOString(),
     });
     reload();
