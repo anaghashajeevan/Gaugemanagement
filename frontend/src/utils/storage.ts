@@ -640,7 +640,9 @@ export interface Standard {
   id: string;
   standardCode: string;
   description: string;
-  certifiedValue: string;
+  certifiedValue: number;        // ← NUMERIC now — e.g. 25.000
+  unit: string;                  // ← e.g. "mm", "µm", "Nm"
+  uncertainty: number;           // ← e.g. 0.0005 (± tolerance)
   validUntil: string;
 }
 
@@ -830,6 +832,18 @@ export interface Location {
   description: string;
   isActive: boolean;
 }
+
+export interface CalibrationMethod {
+  id: string;
+  gaugeType: string;              // e.g. "Vernier Caliper", "Micrometer" - must match GAUGE_TYPES
+  numberOfReadings: number;       // e.g. 5
+  avgDeviationLimit: number;      // e.g. 0.05 (Pass if avg ≤ this, Fail if >)
+  unit: string;                   // e.g. "mm", "µm", "Nm"
+  description: string;            // Optional notes about the method
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 // ═══════════════════════════════════════════════════════════════════
 // STORAGE KEYS
 // ═══════════════════════════════════════════════════════════════════
@@ -848,7 +862,9 @@ const KEYS = {
   operators: 'gm_operators',
   parts: 'gm_parts_v2', 
   locations: 'gm_locations',
+  methods: 'gm_calibration_methods',
 };
+
 
 // ═══════════════════════════════════════════════════════════════════
 // GENERIC HELPERS
@@ -1021,10 +1037,42 @@ const seedLocations: Location[] = [
 ];
 // ─── Standards ───────────────────────────────────────────────────────
 const seedStandards: Standard[] = [
-  { id: 's1', standardCode: 'STD-001', description: 'Gauge Block Set Grade 1', certifiedValue: '0–100mm ±0.001mm', validUntil: '2025-12-31' },
-  { id: 's2', standardCode: 'STD-002', description: 'Ring Gauge Master Ø25mm', certifiedValue: '25.000mm ±0.0005mm', validUntil: '2025-09-30' },
-  { id: 's3', standardCode: 'STD-003', description: 'Surface Plate Grade A', certifiedValue: 'Flatness 0.003mm', validUntil: '2026-03-15' },
-  { id: 's4', standardCode: 'STD-004', description: 'Load Cell 500N NABL', certifiedValue: '500N ±0.1N', validUntil: '2025-11-20' },
+  {
+    id: 's1', standardCode: 'STD-001',
+    description: 'Gauge Block 25mm Grade 1',
+    certifiedValue: 25.000, unit: 'mm', uncertainty: 0.0005,
+    validUntil: '2025-12-31',
+  },
+  {
+    id: 's2', standardCode: 'STD-002',
+    description: 'Ring Gauge Master Ø25mm',
+    certifiedValue: 25.000, unit: 'mm', uncertainty: 0.0005,
+    validUntil: '2025-09-30',
+  },
+  {
+    id: 's3', standardCode: 'STD-003',
+    description: 'Gauge Block 10mm Grade 0',
+    certifiedValue: 10.000, unit: 'mm', uncertainty: 0.0002,
+    validUntil: '2026-03-15',
+  },
+  {
+    id: 's4', standardCode: 'STD-004',
+    description: 'Load Cell 500N NABL',
+    certifiedValue: 500, unit: 'N', uncertainty: 0.1,
+    validUntil: '2025-11-20',
+  },
+  {
+    id: 's5', standardCode: 'STD-005',
+    description: 'Gauge Block 50mm Grade 1',
+    certifiedValue: 50.000, unit: 'mm', uncertainty: 0.0008,
+    validUntil: '2026-01-15',
+  },
+  {
+    id: 's6', standardCode: 'STD-006',
+    description: 'Torque Master 50Nm',
+    certifiedValue: 50, unit: 'Nm', uncertainty: 0.05,
+    validUntil: '2025-10-10',
+  },
 ];
 
 // ─── Vendors ────────────────────────────────────────────────────────
@@ -1146,6 +1194,64 @@ const seedCalibrations: CalibrationRecord[] = [
   },
 ];
 
+const seedMethods: CalibrationMethod[] = [
+  {
+    id: 'mth1', gaugeType: 'Vernier Caliper', numberOfReadings: 5,
+    avgDeviationLimit: 0.05, unit: 'mm',
+    description: 'Standard 5-point calibration across full range',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+  {
+    id: 'mth2', gaugeType: 'Micrometer', numberOfReadings: 5,
+    avgDeviationLimit: 0.002, unit: 'mm',
+    description: 'High-precision 5-point calibration',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+  {
+    id: 'mth3', gaugeType: 'Height Gauge', numberOfReadings: 5,
+    avgDeviationLimit: 0.02, unit: 'mm',
+    description: 'Calibrated at 50, 100, 150, 200, 250mm',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+  {
+    id: 'mth4', gaugeType: 'Dial Indicator', numberOfReadings: 3,
+    avgDeviationLimit: 0.01, unit: 'mm',
+    description: 'Standard 3-point calibration',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+  {
+    id: 'mth5', gaugeType: 'Feeler Gauge', numberOfReadings: 3,
+    avgDeviationLimit: 0.005, unit: 'mm',
+    description: 'Thickness verification against master blocks',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+  {
+    id: 'mth6', gaugeType: 'Ring Gauge', numberOfReadings: 4,
+    avgDeviationLimit: 0.002, unit: 'mm',
+    description: '4-point diameter check at 0°, 45°, 90°, 135°',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+  {
+    id: 'mth7', gaugeType: 'Plug Gauge', numberOfReadings: 3,
+    avgDeviationLimit: 0.002, unit: 'mm',
+    description: 'Go / No-Go verification',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+  {
+    id: 'mth8', gaugeType: 'Torque Wrench', numberOfReadings: 5,
+    avgDeviationLimit: 2.0, unit: 'Nm',
+    description: '5-point torque verification at 20%, 40%, 60%, 80%, 100% of range',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00', updatedAt: '2024-01-01T00:00:00',
+  },
+];
 // ─── MSA Studies (new format) ───────────────────────────────────────
 // const seedMSA: MSAStudy[] = [
 //   {
@@ -1372,6 +1478,7 @@ export function seedIfEmpty(): void {
   if (!localStorage.getItem(KEYS.operators)) setAll(KEYS.operators, seedOperators);
   if (!localStorage.getItem(KEYS.parts)) setAll(KEYS.parts, seedParts);
   if (!localStorage.getItem(KEYS.locations)) setAll(KEYS.locations, seedLocations);
+  if (!localStorage.getItem(KEYS.methods)) setAll(KEYS.methods, seedMethods);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1398,6 +1505,34 @@ export const gaugeStorage = {
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// CRUD — CALIBRATION METHODS
+// ═══════════════════════════════════════════════════════════════════
+
+export const methodStorage = {
+  getAll: () => getAll<CalibrationMethod>(KEYS.methods),
+  getById: (id: string) => getAll<CalibrationMethod>(KEYS.methods).find((m) => m.id === id),
+  getByGaugeType: (gaugeType: string) =>
+    getAll<CalibrationMethod>(KEYS.methods).find(
+      (m) => m.gaugeType.toLowerCase() === gaugeType.toLowerCase() && m.isActive
+    ),
+  add: (item: Omit<CalibrationMethod, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const all = getAll<CalibrationMethod>(KEYS.methods);
+    const now = new Date().toISOString();
+    const newItem = { ...item, id: generateId(), createdAt: now, updatedAt: now } as CalibrationMethod;
+    setAll(KEYS.methods, [...all, newItem]);
+    return newItem;
+  },
+  update: (id: string, updates: Partial<CalibrationMethod>) => {
+    const all = getAll<CalibrationMethod>(KEYS.methods).map((m) =>
+      m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m
+    );
+    setAll(KEYS.methods, all);
+  },
+  delete: (id: string) => {
+    setAll(KEYS.methods, getAll<CalibrationMethod>(KEYS.methods).filter((m) => m.id !== id));
+  },
+};
 // ═══════════════════════════════════════════════════════════════════
 // CRUD — STANDARDS
 // ═══════════════════════════════════════════════════════════════════
