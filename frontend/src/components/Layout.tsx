@@ -353,7 +353,7 @@ import {
   ScrollText,
   KeyRound,
   LogOut,
-  Bell,
+  Bell,Map as MapIcon, 
   ChevronDown,Package, 
 } from 'lucide-react';
 
@@ -406,13 +406,14 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
   const isOperator = user?.role_code === 'shop_floor_operator';
 
   const menuItems = [
-    { label: 'Dashboard', path: '/dashboard', show: true, icon: LayoutDashboard, iconClass: 'text-indigo-500', hoverClass: 'group-hover:text-indigo-600' },
-    { label: 'Gauge Master', path: '/gauges', show: true, icon: Gauge, iconClass: 'text-blue-500', hoverClass: 'group-hover:text-blue-600' },
-    { label: 'Calibration', path: '/calibration', show: !isOperator, icon: ClipboardCheck, iconClass: 'text-emerald-500', hoverClass: 'group-hover:text-emerald-600' },
-    { label: 'MSA Studies', path: '/msa', show: true, icon: BarChart3, iconClass: 'text-violet-500', hoverClass: 'group-hover:text-violet-600' },
-    { label: 'CAPA', path: '/capa', show: true, icon: AlertTriangle, iconClass: 'text-rose-500', hoverClass: 'group-hover:text-rose-600' },
-    { label: 'Issue / Return', path: '/issue-return', show: true, icon: ArrowLeftRight, iconClass: 'text-cyan-500', hoverClass: 'group-hover:text-cyan-600' },
-    { label: 'Reports', path: '/reports', show: true, icon: FileText, iconClass: 'text-indigo-500', hoverClass: 'group-hover:text-indigo-600' },
+    { label: 'Dashboard', path: '/dashboard', show: true, icon: LayoutDashboard },
+    { label: 'Gauge Master', path: '/gauges', show: true, icon: Gauge },
+    { label: 'Calibration', path: '/calibration', show: !isOperator, icon: ClipboardCheck },
+    { label: 'MSA Studies', path: '/msa', show: true, icon: BarChart3 },
+    { label: 'CAPA', path: '/capa', show: true, icon: AlertTriangle },
+    { label: 'Issue / Return', path: '/issue-return', show: true, icon: ArrowLeftRight },
+    { label: 'Heat Map', path: '/heat-map', show: true, icon: MapIcon },
+    { label: 'Reports', path: '/reports', show: true, icon: FileText },
   ];
 
   const adminItems = [
