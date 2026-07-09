@@ -60,7 +60,7 @@ export default function DepartmentRiskChart({ rows }: Props) {
         />
         <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} iconType="circle" iconSize={8} />
         {SERIES.map((s) => (
-          <Bar key={s.key} dataKey={s.key} name={s.name} stackId="risk" fill={s.color} maxBarSize={36} />
+          <Bar key={s.key} dataKey={s.key} name={s.name} stackId="risk" fill={s.color} maxBarSize={16} />
         ))}
       </BarChart>
     </ResponsiveContainer>

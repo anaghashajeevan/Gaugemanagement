@@ -1759,8 +1759,10 @@ import {
   vendorStorage,
   capaStorage,
   auditStorage,
+  auditActor,
   type CalibrationRecord,
 } from '../utils/storage';
+import { useAuth } from '../context/AuthContext';
 import {
   ClipboardCheck,
   Plus,
@@ -1829,6 +1831,7 @@ const clearPendingType = (gaugeId: string) => {
 
 export default function Calibration() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [records, setRecords] = useState<CalibrationRecord[]>(
     calibrationStorage.getAll()
@@ -1940,11 +1943,15 @@ export default function Calibration() {
 
     setPendingType(selectedGaugeForCal, calType);
 
+    const gaugeForCal = allGauges.find((g) => g.id === selectedGaugeForCal);
     auditStorage.add({
       action: 'UPDATE',
       entityType: 'Gauge',
       entityId: selectedGaugeForCal,
-      userId: 'current',
+      entityReference: gaugeForCal?.gaugeCode,
+      description: `Sent gauge ${gaugeForCal?.gaugeCode || selectedGaugeForCal} for ${calType} calibration`,
+      ...auditActor(user),
+
       timestamp: new Date().toISOString(),
     });
 
@@ -2048,7 +2055,10 @@ export default function Calibration() {
       action: 'CALIBRATE',
       entityType: 'CalibrationRecord',
       entityId: newRecord.id,
-      userId: 'current',
+      entityReference: gauge?.gaugeCode,
+      description: `Internal calibration ${result === 'Pass' ? 'passed' : 'failed'} for gauge ${gauge?.gaugeCode || intForm.gaugeId}`,
+      ...auditActor(user),
+
       timestamp: new Date().toISOString(),
     });
 
@@ -2106,7 +2116,9 @@ export default function Calibration() {
       action: 'CALIBRATE',
       entityType: 'CalibrationRecord',
       entityId: newRecord.id,
-      userId: 'current',
+      entityReference: gauge?.gaugeCode,
+      description: `External calibration recorded for gauge ${gauge?.gaugeCode || extForm.gaugeId} (Cert ${extForm.certificateNo})`,
+      ...auditActor(user),
       timestamp: new Date().toISOString(),
     });
 
@@ -2131,12 +2143,16 @@ export default function Calibration() {
       targetDate: capaForm.targetDate,
       status: 'Open',
     });
-
+    
+    const capaGauge = allGauges.find((g) => g.id === capaPrompt.gaugeId);
     auditStorage.add({
       action: 'CREATE',
       entityType: 'CAPA',
       entityId: capaPrompt.id,
-      userId: 'current',
+      entityReference: capaGauge?.gaugeCode,
+      description: `Created CAPA for gauge ${capaGauge?.gaugeCode || capaPrompt.gaugeId} due to calibration failure`,
+      ...auditActor(user),
+
       timestamp: new Date().toISOString(),
     });
 
