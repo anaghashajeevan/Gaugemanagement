@@ -71,6 +71,7 @@ import AuditTrail from './pages/admin/AuditTrail';
 import Locations from './pages/admin/Locations';
 import Parts from './pages/admin/Parts';
 import GaugeHeatMap from './pages/GaugeHeatMap';
+import Methods from './pages/admin/Methods';
 
 function AppRoutes() {
   useEffect(() => {
@@ -142,6 +143,9 @@ function AppRoutes() {
 } />
      <Route path="/admin/parts" element={
   <ProtectedRoute requiredRole="admin"><Parts /></ProtectedRoute>
+} />
+<Route path="/admin/methods" element={
+  <ProtectedRoute requiredRole="admin"><Methods /></ProtectedRoute>
 } />
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

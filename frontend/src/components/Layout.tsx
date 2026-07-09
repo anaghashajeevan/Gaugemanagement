@@ -354,7 +354,7 @@ import {
   KeyRound,
   LogOut,
   Bell,Map as MapIcon, 
-  ChevronDown,Package, 
+  ChevronDown,Package, Settings2,
 } from 'lucide-react';
 
 type PageIconType = ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -421,6 +421,7 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
     { label: 'Roles', path: '/admin/roles', icon: ShieldCheck },
     { label: 'Departments', path: '/admin/departments', icon: Building2 },
     { label: 'Locations', path: '/admin/locations', icon: MapPin },
+    { label: 'Calibration Methods', path: '/admin/methods', icon: Settings2 },
     { label: 'Parts Master', path: '/admin/parts', icon: Package }, 
     { label: 'Outside Labs', path: '/admin/outside-labs', icon: FlaskConical },
     { label: 'Audit Trail', path: '/admin/audit', icon: ScrollText },
