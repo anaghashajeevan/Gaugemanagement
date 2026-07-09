@@ -421,6 +421,7 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
     { label: 'Roles', path: '/admin/roles', icon: ShieldCheck },
     { label: 'Departments', path: '/admin/departments', icon: Building2 },
     { label: 'Locations', path: '/admin/locations', icon: MapPin },
+     { label: 'Calibration Methods', path: '/admin/methods', icon: Settings2 },
     { label: 'Parts Master', path: '/admin/parts', icon: Package }, 
     { label: 'Outside Labs', path: '/admin/outside-labs', icon: FlaskConical },
     { label: 'Audit Trail', path: '/admin/audit', icon: ScrollText },
@@ -464,7 +465,7 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
 
           <div className="absolute left-1/2 -translate-x-1/2 text-center">
           <h1
-            className="text-xl font-extrabold leading-tight tracking-[-0.02em] bg-clip-text text-transparent"
+            className="text-2xl font-extrabold leading-tight tracking-[-0.02em] bg-clip-text text-transparent"
             style={{
               fontFamily: "'Poppins', 'Inter', 'Segoe UI', system-ui, sans-serif",
               backgroundImage: 'linear-gradient(90deg, #4338CA 0%, #4F46E5 25%, #7C3AED 50%, #2563EB 75%, #4338CA 100%)',

@@ -307,7 +307,7 @@ export default function Locations() {
 
       {/* ─── Department-wise Stats ─────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden">
+        <div className="bg-gradient-to-br from-indigo-100 to-indigo-50/60 rounded-xl p-4 shadow-sm border border-indigo-200 relative overflow-hidden">
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 to-purple-500" />
           <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
             Total
@@ -319,7 +319,7 @@ export default function Locations() {
         {departments.slice(0, 4).map((dept) => (
           <div
             key={dept.id}
-            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 relative overflow-hidden"
+            className="bg-gradient-to-br from-emerald-100 to-emerald-50/60 rounded-xl p-4 shadow-sm border border-emerald-200 relative overflow-hidden"
           >
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 to-teal-500" />
             <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold truncate">

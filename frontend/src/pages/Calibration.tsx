@@ -2392,18 +2392,21 @@ export default function Calibration() {
             label: 'Total Records',
             value: tabRecords.length,
             accent: 'from-indigo-500 to-purple-500',
+            cardBg: 'bg-gradient-to-br from-indigo-100 to-indigo-50/60',
           },
           {
             key: 'Pass' as ResultFilter,
             label: 'Pass',
             value: passCount,
             accent: 'from-emerald-500 to-teal-500',
+            cardBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50/60',
           },
           {
             key: 'Fail' as ResultFilter,
             label: 'Fail',
             value: failCount,
             accent: 'from-red-500 to-rose-500',
+            cardBg: 'bg-gradient-to-br from-red-100 to-red-50/60',
           },
         ].map((s) => {
           const active = resultFilter === s.key;
@@ -2411,10 +2414,10 @@ export default function Calibration() {
             <button
               key={s.label}
               onClick={() => setResultFilter(s.key)}
-              className={`w-full text-left bg-white rounded-xl p-4 shadow-sm border relative overflow-hidden transition hover:shadow-md ${
+              className={`w-full text-left ${s.cardBg} rounded-xl p-4 shadow-sm border relative overflow-hidden transition hover:shadow-md ${
                 active
                   ? 'border-indigo-300 ring-2 ring-indigo-100'
-                  : 'border-gray-100'
+                  : 'border-gray-200'
               }`}
             >
               <div

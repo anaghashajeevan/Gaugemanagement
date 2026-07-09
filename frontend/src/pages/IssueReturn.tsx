@@ -758,20 +758,20 @@ export default function IssueReturn() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: 'Currently Issued', value: currentlyIssued.length, accent: 'from-blue-500 to-cyan-500', icon: Package },
-          { label: 'Available to Issue', value: availableGauges.length, accent: 'from-emerald-500 to-teal-500', icon: CheckCircle2 },
-          { label: 'Total Transactions', value: logs.length, accent: 'from-indigo-500 to-purple-500', icon: ArrowLeftRight },
+          { label: 'Currently Issued', value: currentlyIssued.length, accent: 'from-blue-500 to-cyan-500', cardBg: 'bg-gradient-to-br from-blue-100 to-blue-50/60', cardBorder: 'border-blue-200', icon: Package },
+          { label: 'Available to Issue', value: availableGauges.length, accent: 'from-emerald-500 to-teal-500', cardBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50/60', cardBorder: 'border-emerald-200', icon: CheckCircle2 },
+          { label: 'Total Transactions', value: logs.length, accent: 'from-indigo-500 to-purple-500', cardBg: 'bg-gradient-to-br from-indigo-100 to-indigo-50/60', cardBorder: 'border-indigo-200', icon: ArrowLeftRight },
         ].map((s) => {
           const Icon = s.icon;
           return (
-            <div key={s.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 relative overflow-hidden">
+            <div key={s.label} className={`${s.cardBg} rounded-xl p-5 shadow-sm border ${s.cardBorder} relative overflow-hidden`}>
               <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`} />
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{s.label}</p>
                   <p className="text-2xl font-bold text-gray-800 mt-1">{s.value}</p>
                 </div>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gray-50"><Icon className="w-5 h-5 text-gray-400" strokeWidth={2} /></div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br ${s.accent} shadow-sm`}><Icon className="w-5 h-5 text-white" strokeWidth={2} /></div>
               </div>
             </div>
           );

@@ -3004,12 +3004,13 @@ export default function MSA() {
     label: string;
     value: number;
     accent: string;
+    cardBg: string;
     icon: typeof BarChart3;
   }[] = [
-    { key: 'all', label: 'Total Studies', value: studies.length, accent: 'from-indigo-500 to-purple-500', icon: BarChart3 },
-    { key: 'pending', label: 'Pending', value: studies.filter((s) => s.status === 'Pending Measurements').length, accent: 'from-amber-500 to-yellow-500', icon: Clock },
-    { key: 'passed', label: 'Passed', value: studies.filter((s) => s.passFail === 'Pass').length, accent: 'from-emerald-500 to-teal-500', icon: CheckCircle2 },
-    { key: 'failed', label: 'Failed', value: studies.filter((s) => s.passFail === 'Fail').length, accent: 'from-red-500 to-rose-500', icon: AlertTriangle },
+    { key: 'all', label: 'Total Studies', value: studies.length, accent: 'from-indigo-500 to-purple-500', cardBg: 'bg-gradient-to-br from-indigo-100 to-indigo-50/60', icon: BarChart3 },
+    { key: 'pending', label: 'Pending', value: studies.filter((s) => s.status === 'Pending Measurements').length, accent: 'from-amber-500 to-yellow-500', cardBg: 'bg-gradient-to-br from-amber-100 to-amber-50/60', icon: Clock },
+    { key: 'passed', label: 'Passed', value: studies.filter((s) => s.passFail === 'Pass').length, accent: 'from-emerald-500 to-teal-500', cardBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50/60', icon: CheckCircle2 },
+    { key: 'failed', label: 'Failed', value: studies.filter((s) => s.passFail === 'Fail').length, accent: 'from-red-500 to-rose-500', cardBg: 'bg-gradient-to-br from-red-100 to-red-50/60', icon: AlertTriangle },
   ];
 
   // ═══════════════════════════════════════════════════════════════════
@@ -3646,8 +3647,8 @@ export default function MSA() {
               <button
                 key={s.label}
                 onClick={() => { setStatusFilter(s.key); setMainTab('studies'); }}
-                className={`w-full bg-white rounded-xl p-4 shadow-sm border relative overflow-hidden text-left transition hover:shadow-md ${
-                  active ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-gray-100'
+                className={`w-full ${s.cardBg} rounded-xl p-4 shadow-sm border relative overflow-hidden text-left transition hover:shadow-md ${
+                  active ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-gray-200'
                 }`}
               >
                 <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`} />

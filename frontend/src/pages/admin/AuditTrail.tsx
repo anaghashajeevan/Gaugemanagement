@@ -769,14 +769,14 @@ export default function AuditTrail() {
       {/* Stats */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
         {[
-          { label: 'Total', value: stats.total, accent: 'from-indigo-500 to-purple-500' },
-          { label: 'Logins', value: stats.logins, accent: 'from-emerald-500 to-teal-500' },
-          { label: 'Failed', value: stats.failed, accent: 'from-red-500 to-rose-500' },
-          { label: 'Creates', value: stats.creates, accent: 'from-blue-500 to-cyan-500' },
-          { label: 'Updates', value: stats.updates, accent: 'from-amber-500 to-yellow-500' },
-          { label: 'Deletes', value: stats.deletes, accent: 'from-red-600 to-red-500' },
+          { label: 'Total', value: stats.total, accent: 'from-indigo-500 to-purple-500', cardBg: 'bg-gradient-to-br from-indigo-100 to-indigo-50/60', cardBorder: 'border-indigo-200' },
+          { label: 'Logins', value: stats.logins, accent: 'from-emerald-500 to-teal-500', cardBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50/60', cardBorder: 'border-emerald-200' },
+          { label: 'Failed', value: stats.failed, accent: 'from-red-500 to-rose-500', cardBg: 'bg-gradient-to-br from-red-100 to-red-50/60', cardBorder: 'border-red-200' },
+          { label: 'Creates', value: stats.creates, accent: 'from-blue-500 to-cyan-500', cardBg: 'bg-gradient-to-br from-blue-100 to-blue-50/60', cardBorder: 'border-blue-200' },
+          { label: 'Updates', value: stats.updates, accent: 'from-amber-500 to-yellow-500', cardBg: 'bg-gradient-to-br from-amber-100 to-amber-50/60', cardBorder: 'border-amber-200' },
+          { label: 'Deletes', value: stats.deletes, accent: 'from-orange-600 to-orange-500', cardBg: 'bg-gradient-to-br from-orange-100 to-orange-50/60', cardBorder: 'border-orange-200' },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 relative overflow-hidden">
+          <div key={s.label} className={`${s.cardBg} rounded-xl p-3.5 shadow-sm border ${s.cardBorder} relative overflow-hidden`}>
             <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${s.accent}`} />
             <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{s.label}</p>
             <p className="text-xl font-bold text-gray-800 mt-0.5">{s.value}</p>
