@@ -70,6 +70,7 @@ import OutsideLabs from './pages/admin/OutsideLabs';
 import AuditTrail from './pages/admin/AuditTrail';
 import Locations from './pages/admin/Locations';
 import Parts from './pages/admin/Parts';
+import GaugeHeatMap from './pages/GaugeHeatMap';
 
 function AppRoutes() {
   useEffect(() => {
@@ -106,6 +107,9 @@ function AppRoutes() {
       <Route path="/reports" element={
         <ProtectedRoute><Reports /></ProtectedRoute>
       } />
+      <Route path="/heat-map" element={
+  <ProtectedRoute><GaugeHeatMap /></ProtectedRoute>
+} />
 
       {/* Protected — Non-operator */}
       <Route path="/calibration" element={

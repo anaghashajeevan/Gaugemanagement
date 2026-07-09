@@ -353,7 +353,7 @@ import {
   ScrollText,
   KeyRound,
   LogOut,
-  Bell,
+  Bell,Map as MapIcon, 
   ChevronDown,Package, 
 } from 'lucide-react';
 
@@ -412,6 +412,7 @@ export default function Layout({ children, pageTitle = 'Dashboard', pageSubtitle
     { label: 'MSA Studies', path: '/msa', show: true, icon: BarChart3 },
     { label: 'CAPA', path: '/capa', show: true, icon: AlertTriangle },
     { label: 'Issue / Return', path: '/issue-return', show: true, icon: ArrowLeftRight },
+    { label: 'Heat Map', path: '/heat-map', show: true, icon: MapIcon },
     { label: 'Reports', path: '/reports', show: true, icon: FileText },
   ];
 
