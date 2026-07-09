@@ -174,11 +174,11 @@ export default function DataTable<T>({
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
-            <tr style={{ background: 'linear-gradient(90deg, #f8f7ff 0%, #f5f3ff 100%)' }}>
+            <tr style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
               {columns.map((col, i) => (
                 <th
                   key={i}
-                  className={`${cellPad} text-xs font-bold uppercase tracking-wider text-gray-500 border-b border-gray-100 ${alignClass(col.align)} whitespace-nowrap`}
+                  className={`${cellPad} text-xs font-bold uppercase tracking-wider text-white border-b border-white/10 ${alignClass(col.align)} whitespace-nowrap`}
                   style={col.width ? { width: col.width } : {}}
                 >
                   {col.header}

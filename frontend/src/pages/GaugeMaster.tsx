@@ -580,21 +580,22 @@
 
 // src/pages/GaugeMaster.tsx
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ExcelJS from 'exceljs';
 import Layout from '../components/Layout';
 import DataTable, { type Column } from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import {
   gaugeStorage,
-  departmentStorage,
   locationStorage,
   auditStorage,
   generateId,
   getQuarantineReason,
   type Gauge,
 } from '../utils/storage';
+import { departmentsAPI, type DepartmentType } from '../api/api';
 import {
   Gauge as GaugeIcon,
   Plus,
@@ -609,6 +610,13 @@ import {
   Building2,
   Calendar,
   Activity,
+  ImagePlus,
+  X,
+  FileSpreadsheet,
+  Download,
+  Upload,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 
 const GAUGE_TYPES = [
@@ -621,8 +629,99 @@ const STATUS_OPTIONS: Gauge['status'][] = [
   'Available', 'Issued', 'Under Calibration', 'Under MSA Study', 'Under Review', 'Scrapped',
 ];
 
+// ─── Excel/CSV Import ─────────────────────────────────────────────────
+const IMPORT_COLUMNS: { header: string; key: keyof Omit<Gauge, 'id' | 'image'> }[] = [
+  { header: 'Gauge Code', key: 'gaugeCode' },
+  { header: 'Name', key: 'name' },
+  { header: 'Type', key: 'type' },
+  { header: 'Range', key: 'range' },
+  { header: 'Least Count', key: 'leastCount' },
+  { header: 'Department', key: 'department' },
+  { header: 'Location', key: 'location' },
+  { header: 'Calibration Frequency (Months)', key: 'frequencyMonths' },
+  { header: 'Status', key: 'status' },
+  { header: 'Last Calibration Date (YYYY-MM-DD)', key: 'lastCalibrationDate' },
+  { header: 'Next Due Date (YYYY-MM-DD)', key: 'nextDueDate' },
+];
+
+const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// Reads any worksheet into a plain string[][] table (dates → YYYY-MM-DD text).
+function worksheetToTable(ws: ExcelJS.Worksheet): string[][] {
+  const table: string[][] = [];
+  ws.eachRow({ includeEmpty: false }, (row) => {
+    const cells: string[] = [];
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      const v = cell.value as unknown;
+      if (v instanceof Date) {
+        cells.push(v.toISOString().split('T')[0]);
+      } else if (v && typeof v === 'object' && 'text' in (v as Record<string, unknown>)) {
+        cells.push(String((v as { text?: unknown }).text ?? ''));
+      } else if (v === null || v === undefined) {
+        cells.push('');
+      } else {
+        cells.push(String(v));
+      }
+    });
+    table.push(cells);
+  });
+  return table.filter((r) => r.some((c) => c.trim() !== ''));
+}
+
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+    if (inQuotes) {
+      if (char === '"' && next === '"') { field += '"'; i++; }
+      else if (char === '"') { inQuotes = false; }
+      else { field += char; }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field); field = '';
+    } else if (char === '\r') {
+      // skip
+    } else if (char === '\n') {
+      row.push(field); rows.push(row); row = []; field = '';
+    } else {
+      field += char;
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim() !== ''));
+}
+
+const normalizeDate = (raw: string): string => {
+  const value = (raw || '').trim();
+  if (!value) return '';
+  let d = new Date(value);
+  if (!isNaN(d.getTime()) && /\d{4}/.test(value)) {
+    return d.toISOString().split('T')[0];
+  }
+  const m = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const [, dd, mm, yyyy] = m;
+    d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+  return '';
+};
+
+interface ImportRow {
+  rowNum: number;
+  data: Omit<Gauge, 'id'>;
+  errors: string[];
+  warnings: string[];
+  matchedGaugeId: string | null;
+}
+
 const emptyForm: Omit<Gauge, 'id'> = {
-  gaugeCode: '', name: '', type: '', range: '', leastCount: '',
+  gaugeCode: '', name: '', image: '', type: '', range: '', leastCount: '',
   department: '', location: '', frequencyMonths: 6, status: 'Available',
   lastCalibrationDate: '', nextDueDate: '',
 };
@@ -639,12 +738,29 @@ export default function GaugeMaster() {
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const [addLocOpen, setAddLocOpen] = useState(false);
   const [newLocName, setNewLocName] = useState('');
   const [newLocDesc, setNewLocDesc] = useState('');
 
-  const departments = departmentStorage.getAll();
+  const [departments, setDepartments] = useState<DepartmentType[]>([]);
+
+  // ─── Excel/CSV Import ─────────────────────────────────────────────
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importStep, setImportStep] = useState<'upload' | 'preview' | 'done'>('upload');
+  const [importFileName, setImportFileName] = useState('');
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [importResult, setImportResult] = useState({ created: 0, updated: 0 });
+  const [importParseError, setImportParseError] = useState('');
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    departmentsAPI
+      .list()
+      .then((data) => setDepartments(Array.isArray(data) ? data : []))
+      .catch(() => setDepartments([]));
+  }, []);
 
   const deptLocations = useMemo(
     () => form.department ? locationStorage.getByDepartment(form.department) : [],
@@ -714,7 +830,7 @@ export default function GaugeMaster() {
     const dept = departments.find((d) => d.name === form.department);
     const newLoc = locationStorage.add({
       name: newLocName.trim(),
-      departmentId: dept?.id || '',
+      departmentId: dept ? String(dept.id) : '',
       departmentName: form.department,
       description: newLocDesc.trim(),
       isActive: true,
@@ -732,9 +848,258 @@ export default function GaugeMaster() {
     });
   };
 
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => updateField('image', reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // ─── Auto-calculate Next Due Date from Last Calibration Date + Frequency ───
+  const calcNextDue = (lastCalDate: string, months: number): string => {
+    if (!lastCalDate) return '';
+    const d = new Date(lastCalDate);
+    if (isNaN(d.getTime())) return '';
+    d.setMonth(d.getMonth() + (months || 0));
+    return d.toISOString().split('T')[0];
+  };
+
+  // ─── Excel/CSV Import ───────────────────────────────────────────────
+  const openImportModal = () => {
+    setImportRows([]);
+    setImportFileName('');
+    setImportParseError('');
+    setImportStep('upload');
+    setImportModalOpen(true);
+  };
+
+  const downloadTemplate = async () => {
+    const wb = new ExcelJS.Workbook();
+
+    // ─── Instructions sheet (opens first) ────────────────────────────
+    const info = wb.addWorksheet('Instructions');
+    info.getColumn(1).width = 100;
+    let r = 1;
+    const addLine = (text: string, opts: { bold?: boolean; size?: number } = {}) => {
+      const cell = info.getRow(r++).getCell(1);
+      cell.value = text;
+      cell.font = { bold: !!opts.bold, size: opts.size || 11 };
+      cell.alignment = { wrapText: true, vertical: 'top' };
+    };
+    addLine('How to fill this template', { bold: true, size: 14 });
+    addLine('');
+    addLine('1. Switch to the "Gauge Data" tab below and enter one row per gauge.');
+    addLine('2. Required for every row: Gauge Code, Name, Type, Department.');
+    addLine('3. Department must exactly match a department already set up in the system (Administration → Departments).');
+    addLine('4. Status: leave blank to default to "Available". Otherwise use one of: Available, Issued, Under Calibration, Under MSA Study, Under Review, Scrapped.');
+    addLine('5. Calibration Frequency (Months): leave blank to default to 6.');
+    addLine('6. Last Calibration Date: enter as YYYY-MM-DD (e.g. 2026-01-15). Leave blank if the gauge has not been calibrated yet.');
+    addLine('7. Next Due Date: you do NOT need to fill this in — it is calculated automatically from Last Calibration Date + Calibration Frequency. Only enter a value here if you want to override the automatic calculation.');
+    addLine('8. If a Gauge Code you enter already exists in the system, that existing gauge will be UPDATED with your new data instead of creating a duplicate.');
+    addLine('9. Save this file and upload it back on the Gauge Master page using "Import Excel".');
+    addLine('Note: Row 2 in "Gauge Data" is an example — replace it with your own data (or delete the row) before importing.');
+
+    // ─── Data sheet — header + one example row ───────────────────────
+    const data = wb.addWorksheet('Gauge Data');
+    data.columns = IMPORT_COLUMNS.map((c) => ({ header: c.header, key: c.key, width: 22 }));
+    data.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    data.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF6366F1' },
+    };
+    // Force date columns to plain text so Excel never auto-converts them
+    // into date serials (avoids the "####" column-width overflow issue
+    // and locale-dependent reformatting on save).
+    data.getColumn('lastCalibrationDate').numFmt = '@';
+    data.getColumn('nextDueDate').numFmt = '@';
+
+    data.addRow({
+      gaugeCode: 'VNR-005',
+      name: 'Vernier Caliper 200mm',
+      type: 'Vernier Caliper',
+      range: '0-200mm',
+      leastCount: '0.02mm',
+      department: 'Quality Control',
+      location: 'QC Lab Shelf A2',
+      frequencyMonths: 6,
+      status: 'Available',
+      lastCalibrationDate: '2026-01-15',
+      nextDueDate: '',
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'gauge_import_template.xlsx';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const validateImportRow = (
+    raw: Record<string, string>,
+    rowNum: number,
+    seenCodes: Set<string>
+  ): ImportRow => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    const gaugeCode = (raw.gaugeCode || '').trim();
+    const name = (raw.name || '').trim();
+    const type = (raw.type || '').trim();
+    const department = (raw.department || '').trim();
+
+    if (!gaugeCode) errors.push('Gauge Code is required');
+    else if (seenCodes.has(gaugeCode.toLowerCase())) errors.push('Duplicate Gauge Code in this file');
+    else seenCodes.add(gaugeCode.toLowerCase());
+
+    if (!name) errors.push('Name is required');
+    if (!type) errors.push('Type is required');
+
+    if (!department) {
+      errors.push('Department is required');
+    } else if (!departments.some((d) => d.name.toLowerCase() === department.toLowerCase())) {
+      errors.push(`Department "${department}" does not exist — add it under Administration → Departments first`);
+    }
+
+    let status = (raw.status || 'Available').trim() as Gauge['status'];
+    if (!STATUS_OPTIONS.includes(status)) {
+      if (raw.status?.trim()) warnings.push(`Unknown status "${raw.status}" — defaulted to Available`);
+      status = 'Available';
+    }
+
+    const frequencyMonths = parseInt(raw.frequencyMonths, 10) || 6;
+    const lastCalibrationDate = normalizeDate(raw.lastCalibrationDate || '');
+    let nextDueDate = normalizeDate(raw.nextDueDate || '');
+    if (!nextDueDate && lastCalibrationDate) {
+      nextDueDate = calcNextDue(lastCalibrationDate, frequencyMonths);
+    }
+
+    const existing = gaugeCode
+      ? gauges.find((g) => g.gaugeCode.toLowerCase() === gaugeCode.toLowerCase())
+      : undefined;
+
+    return {
+      rowNum,
+      data: {
+        gaugeCode, name, type,
+        range: (raw.range || '').trim(),
+        leastCount: (raw.leastCount || '').trim(),
+        department,
+        location: (raw.location || '').trim(),
+        frequencyMonths,
+        status,
+        lastCalibrationDate,
+        nextDueDate,
+        image: existing?.image || '',
+      },
+      errors,
+      warnings,
+      matchedGaugeId: existing?.id || null,
+    };
+  };
+
+  const buildImportRows = (table: string[][]): ImportRow[] => {
+    const headerRow = table[0];
+    const keyForCol = headerRow.map((h) => {
+      const norm = normalizeHeader(h);
+      return IMPORT_COLUMNS.find((c) => normalizeHeader(c.header) === norm)?.key || null;
+    });
+
+    const seenCodes = new Set<string>();
+    return table.slice(1).map((cells, idx) => {
+      const raw: Record<string, string> = {};
+      keyForCol.forEach((key, colIdx) => {
+        if (key) raw[key] = cells[colIdx] ?? '';
+      });
+      return validateImportRow(raw, idx + 2, seenCodes);
+    });
+  };
+
+  const handleImportFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFileName(file.name);
+    setImportParseError('');
+    e.target.value = '';
+
+    try {
+      let table: string[][] = [];
+
+      if (/\.csv$/i.test(file.name)) {
+        table = parseCSV(await file.text());
+      } else {
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(await file.arrayBuffer());
+        const ws = wb.getWorksheet('Gauge Data') || wb.worksheets[wb.worksheets.length - 1];
+        table = ws ? worksheetToTable(ws) : [];
+      }
+
+      if (table.length < 2) {
+        setImportRows([]);
+        setImportStep('preview');
+        return;
+      }
+      setImportRows(buildImportRows(table));
+      setImportStep('preview');
+    } catch {
+      setImportRows([]);
+      setImportParseError('Could not read this file. Please upload the .xlsx template (or a .csv export of it).');
+      setImportStep('preview');
+    }
+  };
+
+  const handleConfirmImport = () => {
+    const validRows = importRows.filter((r) => r.errors.length === 0);
+    let created = 0;
+    let updated = 0;
+    validRows.forEach((r) => {
+      if (r.matchedGaugeId) {
+        gaugeStorage.update(r.matchedGaugeId, r.data);
+        updated++;
+      } else {
+        gaugeStorage.add(r.data);
+        created++;
+      }
+    });
+    auditStorage.add({
+      action: 'CREATE',
+      entityType: 'Gauge',
+      entityId: 'bulk-import',
+      userId: 'current',
+      timestamp: new Date().toISOString(),
+    });
+    reload();
+    setImportResult({ created, updated });
+    setImportStep('done');
+  };
+
   const columns: Column<Gauge>[] = [
     { header: 'Gauge Code', cell: (r) => <span className="font-bold text-indigo-600">{r.gaugeCode}</span> },
     { header: 'Name', cell: (r) => <span>{r.name}</span> },
+    {
+      header: 'Image',
+      width: '96px',
+      align: 'center' as const,
+      cell: (r) =>
+        r.image ? (
+          <img
+            src={r.image}
+            alt={r.name}
+            className="w-16 h-12 object-contain rounded-lg border border-gray-200 bg-white mx-auto"
+          />
+        ) : (
+          <div className="w-16 h-12 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto">
+            <GaugeIcon className="w-4 h-4 text-gray-300" strokeWidth={1.5} />
+          </div>
+        ),
+    },
     { header: 'Type', cell: (r) => <span>{r.type}</span> },
     { header: 'Department', cell: (r) => <span>{r.department}</span> },
     { header: 'Location', cell: (r) => (
@@ -803,11 +1168,17 @@ export default function GaugeMaster() {
             {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-2 px-5 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition text-sm"
-          style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
-          <Plus className="w-4 h-4" strokeWidth={2.5} />Add Gauge
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={openImportModal}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl shadow-sm hover:shadow-md hover:border-indigo-200 transition text-sm">
+            <FileSpreadsheet className="w-4 h-4 text-indigo-500" strokeWidth={2} />Import Excel
+          </button>
+          <button onClick={openAdd}
+            className="flex items-center gap-2 px-5 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition text-sm"
+            style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
+            <Plus className="w-4 h-4" strokeWidth={2.5} />Add Gauge
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -918,6 +1289,47 @@ export default function GaugeMaster() {
             </div>
           </div>
 
+          {/* ─── Gauge Image ──────────────────────────────────────── */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-800 mb-1.5">
+              Gauge Image
+            </label>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="hidden"
+            />
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold rounded-xl transition text-sm"
+              >
+                <ImagePlus className="w-4 h-4" strokeWidth={2} />
+                Choose Image
+              </button>
+              {form.image && (
+                <div className="relative">
+                  <img
+                    src={form.image}
+                    alt="Gauge preview"
+                    className="w-24 h-16 object-contain rounded-lg border border-gray-200 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => updateField('image', '')}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition"
+                    title="Remove image"
+                  >
+                    <X className="w-3 h-3" strokeWidth={2.5} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* ─── Section 2: Technical Specs ───────────────────────── */}
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -953,7 +1365,16 @@ export default function GaugeMaster() {
                   type="number"
                   min={1}
                   value={form.frequencyMonths}
-                  onChange={(e) => updateField('frequencyMonths', parseInt(e.target.value) || 6)}
+                  onChange={(e) => {
+                    const months = parseInt(e.target.value) || 6;
+                    setForm((prev) => ({
+                      ...prev,
+                      frequencyMonths: months,
+                      nextDueDate: prev.lastCalibrationDate
+                        ? calcNextDue(prev.lastCalibrationDate, months)
+                        : prev.nextDueDate,
+                    }));
+                  }}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition text-sm"
                 />
               </div>
@@ -1051,7 +1472,14 @@ export default function GaugeMaster() {
                 <input
                   type="date"
                   value={form.lastCalibrationDate}
-                  onChange={(e) => updateField('lastCalibrationDate', e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      lastCalibrationDate: value,
+                      nextDueDate: calcNextDue(value, prev.frequencyMonths),
+                    }));
+                  }}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition text-sm"
                 />
               </div>
@@ -1065,6 +1493,9 @@ export default function GaugeMaster() {
                   onChange={(e) => updateField('nextDueDate', e.target.value)}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition text-sm"
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  Auto-calculated from Last Calibration Date + Frequency — you can still adjust it manually.
+                </p>
               </div>
             </div>
           </div>
@@ -1121,6 +1552,168 @@ export default function GaugeMaster() {
           </div>
           <p className="text-gray-700">Delete gauge <span className="font-bold">{gauges.find((g) => g.id === deleteId)?.gaugeCode}</span>?</p>
         </div>
+      </Modal>
+
+      {/* ─── Import Excel Modal ────────────────────────────────────── */}
+      <Modal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title="Import Gauges from Excel"
+        subtitle={
+          importStep === 'upload'
+            ? 'Download the template, fill it in, and upload it back'
+            : importStep === 'preview'
+            ? `Reviewing ${importFileName}`
+            : 'Import complete'
+        }
+        maxWidth="2xl"
+        footer={
+          importStep === 'upload' ? (
+            <button onClick={() => setImportModalOpen(false)}
+              className="px-4 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold rounded-xl transition text-sm">
+              Cancel
+            </button>
+          ) : importStep === 'preview' ? (
+            <>
+              <button onClick={() => setImportStep('upload')}
+                className="px-4 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold rounded-xl transition text-sm">
+                Back
+              </button>
+              <button
+                onClick={handleConfirmImport}
+                disabled={importRows.filter((r) => r.errors.length === 0).length === 0}
+                className="flex items-center gap-2 px-6 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition text-sm disabled:opacity-50"
+                style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
+                <Upload className="w-4 h-4" strokeWidth={2} />
+                Import {importRows.filter((r) => r.errors.length === 0).length} Gauges
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setImportModalOpen(false)}
+              className="px-6 py-2.5 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition text-sm"
+              style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
+              Done
+            </button>
+          )
+        }
+      >
+        {importStep === 'upload' && (
+          <div className="space-y-4">
+            <button
+              onClick={downloadTemplate}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold rounded-xl transition text-sm"
+            >
+              <Download className="w-4 h-4" strokeWidth={2} />
+              Download Template (.xlsx)
+            </button>
+
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".csv,.xlsx"
+              onChange={handleImportFileSelect}
+              className="hidden"
+            />
+            <div
+              onClick={() => importFileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 hover:border-indigo-300 rounded-xl p-8 text-center cursor-pointer transition"
+            >
+              <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" strokeWidth={1.5} />
+              <p className="text-sm font-semibold text-gray-600">Click to upload the filled template</p>
+              <p className="text-xs text-gray-400 mt-1">.xlsx (or .csv export of it)</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 space-y-1">
+              <p>Open the downloaded file's <strong>"Instructions"</strong> tab first, then fill in the <strong>"Gauge Data"</strong> tab.</p>
+              <p><strong>Gauge Code, Name, Type, Department</strong> are required for every row.</p>
+              <p>Department must already exist under Administration → Departments.</p>
+              <p>If Gauge Code matches an existing gauge, that gauge will be <strong>updated</strong> instead of duplicated.</p>
+              <p>Leave "Next Due Date" blank to auto-calculate it from Last Calibration Date + Frequency.</p>
+            </div>
+          </div>
+        )}
+
+        {importStep === 'preview' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
+                {importRows.filter((r) => r.errors.length === 0).length} valid
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 rounded-full text-xs font-semibold">
+                <XCircle className="w-3.5 h-3.5" strokeWidth={2} />
+                {importRows.filter((r) => r.errors.length > 0).length} with errors
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+                {importRows.filter((r) => r.matchedGaugeId && r.errors.length === 0).length} will update existing
+              </div>
+            </div>
+
+            {importParseError ? (
+              <p className="text-sm text-red-600 text-center py-6 flex items-center justify-center gap-2">
+                <XCircle className="w-4 h-4 flex-shrink-0" strokeWidth={2} />
+                {importParseError}
+              </p>
+            ) : importRows.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">
+                No rows found in this file. Make sure you filled in the "Gauge Data" sheet below the header row.
+              </p>
+            ) : (
+              <div className="border border-gray-100 rounded-xl overflow-hidden max-h-80 overflow-y-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="sticky top-0">
+                    <tr style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)' }}>
+                      <th className="px-3 py-2 text-left text-white font-bold">Row</th>
+                      <th className="px-3 py-2 text-left text-white font-bold">Gauge Code</th>
+                      <th className="px-3 py-2 text-left text-white font-bold">Name</th>
+                      <th className="px-3 py-2 text-left text-white font-bold">Department</th>
+                      <th className="px-3 py-2 text-left text-white font-bold">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {importRows.map((r) => (
+                      <tr key={r.rowNum} className={r.errors.length > 0 ? 'bg-red-50/40' : 'bg-white'}>
+                        <td className="px-3 py-2 text-gray-500">{r.rowNum}</td>
+                        <td className="px-3 py-2 font-semibold text-indigo-600">{r.data.gaugeCode || '—'}</td>
+                        <td className="px-3 py-2 text-gray-700">{r.data.name || '—'}</td>
+                        <td className="px-3 py-2 text-gray-700">{r.data.department || '—'}</td>
+                        <td className="px-3 py-2">
+                          {r.errors.length > 0 ? (
+                            <span className="text-red-600 flex items-start gap-1">
+                              <XCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" strokeWidth={2} />
+                              {r.errors.join('; ')}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2} />
+                              {r.matchedGaugeId ? 'Will update existing gauge' : 'Will create new gauge'}
+                              {r.warnings.length > 0 && (
+                                <span className="text-amber-600 ml-1">({r.warnings.join('; ')})</span>
+                              )}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {importStep === 'done' && (
+          <div className="flex flex-col items-center text-center py-6">
+            <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="w-7 h-7 text-emerald-500" strokeWidth={2} />
+            </div>
+            <p className="text-gray-800 font-semibold">Import complete</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {importResult.created} gauge{importResult.created === 1 ? '' : 's'} created,{' '}
+              {importResult.updated} gauge{importResult.updated === 1 ? '' : 's'} updated.
+            </p>
+          </div>
+        )}
       </Modal>
     </Layout>
   );

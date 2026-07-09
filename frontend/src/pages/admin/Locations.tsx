@@ -1,16 +1,16 @@
 // src/pages/admin/Locations.tsx
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import DataTable, { type Column } from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import Modal from '../../components/Modal';
 import {
   locationStorage,
-  departmentStorage,
   auditStorage,
   type Location,
 } from '../../utils/storage';
+import { departmentsAPI, type DepartmentType } from '../../api/api';
 import {
   MapPin,
   Plus,
@@ -42,7 +42,15 @@ export default function Locations() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const departments = departmentStorage.getAll();
+  const [departments, setDepartments] = useState<DepartmentType[]>([]);
+
+  useEffect(() => {
+    departmentsAPI
+      .list()
+      .then((data) => setDepartments(Array.isArray(data) ? data : []))
+      .catch(() => setDepartments([]));
+  }, []);
+
   const reload = () => setLocations(locationStorage.getAll());
 
   // ─── Filtering ────────────────────────────────────────────────────
@@ -150,7 +158,7 @@ export default function Locations() {
     setForm({
       ...form,
       departmentName: deptName,
-      departmentId: dept?.id || '',
+      departmentId: dept ? String(dept.id) : '',
     });
   };
 
