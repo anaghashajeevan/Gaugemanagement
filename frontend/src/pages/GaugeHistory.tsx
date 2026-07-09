@@ -673,14 +673,22 @@ export default function GaugeHistory() {
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md"
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                }}
-              >
-                <GaugeIcon className="w-7 h-7" strokeWidth={2} />
-              </div>
+              {gauge.image ? (
+                <img
+                  src={gauge.image}
+                  alt={gauge.name}
+                  className="w-14 h-14 rounded-2xl object-contain bg-white shadow-md border border-gray-100"
+                />
+              ) : (
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md"
+                  style={{
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  }}
+                >
+                  <GaugeIcon className="w-7 h-7" strokeWidth={2} />
+                </div>
+              )}
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-xl font-bold text-gray-900">

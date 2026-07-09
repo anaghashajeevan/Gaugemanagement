@@ -624,6 +624,7 @@ export interface Gauge {
   id: string;
   gaugeCode: string;
   name: string;
+  image?: string;
   type: string;
   range: string;
   leastCount: string;
